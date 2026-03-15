@@ -1,0 +1,9 @@
+{
+  "name": "contracts-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve -l 8080",
+    "dev": "npx --yes serve -l 8080"
+  }
+}
