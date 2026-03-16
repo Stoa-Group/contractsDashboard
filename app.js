@@ -1428,7 +1428,7 @@ function renderPropertyView(globalSearch) {
   bindSubTableClicks(tbody);
 }
 
-function buildContractSubTable(contracts) {
+function buildContractSubTable(contracts, hideColumn) {
   if (!contracts || contracts.length === 0) {
     return '<div class="empty-state-sm">No contracts.</div>';
   }
@@ -1442,12 +1442,15 @@ function buildContractSubTable(contracts) {
     return da - db;
   });
 
+  const showVendor = hideColumn !== 'vendor';
+  const showCategory = hideColumn !== 'category';
+
   return `<table class="table sub-table">
     <thead>
       <tr>
         <th>Description</th>
-        <th>Vendor</th>
-        <th>Category</th>
+        ${showVendor ? '<th>Vendor</th>' : ''}
+        ${showCategory ? '<th>Category</th>' : ''}
         <th>Status</th>
         <th class="num">Monthly Cost</th>
         <th>Billing</th>
@@ -1467,8 +1470,8 @@ function buildContractSubTable(contracts) {
         const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
         return `<tr class="contract-row ${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click for details">
           <td data-label="Description">${escapeHtml(c.Description || '—')}${ncBadge}</td>
-          <td data-label="Vendor">${escapeHtml(vendorName(c.VendorId))}</td>
-          <td data-label="Category">${escapeHtml(categoryName(c.CategoryId))}</td>
+          ${showVendor ? `<td data-label="Vendor">${escapeHtml(vendorName(c.VendorId))}</td>` : ''}
+          ${showCategory ? `<td data-label="Category">${escapeHtml(categoryName(c.CategoryId))}</td>` : ''}
           <td data-label="Status">${getStatusBadge(c.Status)}</td>
           <td class="num" data-label="Monthly Cost">${formatCurrency(c.MonthlyCost)}</td>
           <td data-label="Billing">${escapeHtml(c.BillingFrequency || '—')}</td>
@@ -1571,7 +1574,7 @@ function renderCategoryView(globalSearch) {
           </tr>
           <tr class="category-detail-row" data-cat-detail="${cat.CategoryId}" style="display:none;">
             <td colspan="8" style="padding:0;">
-              <div class="sub-table-wrap">${buildContractSubTable(cat.contracts)}</div>
+              <div class="sub-table-wrap">${buildContractSubTable(cat.contracts, 'category')}</div>
             </td>
           </tr>`;
         }).join('')}
@@ -1716,7 +1719,7 @@ function renderVendorView(globalSearch) {
     <tr class="detail-row" data-vendor-detail="${r.VendorId}" style="display:none;">
       <td colspan="7">
         <div class="sub-table-wrap">
-          ${buildContractSubTable(r.contracts)}
+          ${buildContractSubTable(r.contracts, 'vendor')}
         </div>
       </td>
     </tr>
@@ -3249,7 +3252,7 @@ async function openDetailModal(contractId) {
   const attachmentsEl = $('#detail-attachments');
   if (attachmentsEl) {
     attachmentsEl.innerHTML = '<div class="loading-inline">Loading attachments…</div>';
-    loadContractAttachments(contractId, attachmentsEl, true);
+    loadContractAttachments(contractId, attachmentsEl, false);
   }
 
   const historyEl = $('#detail-history');
@@ -3336,9 +3339,9 @@ async function loadContractAttachments(contractId, container, showDeleteButton) 
     const result = await API.getContractAttachments(contractId);
     if (result.success && Array.isArray(result.data) && result.data.length > 0) {
       container.innerHTML = result.data.map(att => {
-        const attId = att.AttachmentId || att.Id;
+        const attId = att.ContractAttachmentId || att.AttachmentId || att.Id;
         const fileName = att.FileName || att.filename || att.OriginalName || 'File';
-        const fileSize = att.FileSize ? ` (${formatFileSize(att.FileSize)})` : '';
+        const fileSize = (att.FileSizeBytes || att.FileSize) ? ` (${formatFileSize(att.FileSizeBytes || att.FileSize)})` : '';
         return `<div class="attachment-item" data-attachment-id="${attId}">
           <span class="attachment-name">${escapeHtml(fileName)}${fileSize}</span>
           <div class="attachment-actions">
