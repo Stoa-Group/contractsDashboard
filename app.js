@@ -474,13 +474,21 @@ async function loadAllData() {
     if (c.DaysUntilExpiry == null && c.ExpirationDate) c.DaysUntilExpiry = daysUntil(c.ExpirationDate);
   });
 
+  const beforeProjectFilter = allProjects.length;
+  allProjects = allProjects.filter(p => {
+    const stage = (p.Stage || '').toLowerCase();
+    return ACTIVE_PROPERTY_STAGES.includes(stage);
+  });
+  console.log(`[Filter] ${allProjects.length} of ${beforeProjectFilter} projects are active portfolio properties`);
+
+  const activeProjectIds = new Set(allProjects.map(p => p.ProjectId || p.Id));
   const beforeFilter = allContracts.length;
-  allContracts = allContracts.filter(c => isActiveProperty(c.ProjectId));
+  allContracts = allContracts.filter(c => activeProjectIds.has(c.ProjectId));
   console.log(`[Filter] Showing ${allContracts.length} of ${beforeFilter} contracts (active portfolio properties only)`);
 
   spendByPropertyData = spendByPropertyData.filter(d => {
     const name = d.ProjectName || '';
-    return getPortfolioProjects().some(p => (p.ProjectName || '') === name);
+    return allProjects.some(p => (p.ProjectName || '') === name);
   });
 
   if (results[5].status === 'fulfilled' && results[5].value && results[5].value.success) {
