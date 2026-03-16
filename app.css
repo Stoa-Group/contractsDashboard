@@ -559,8 +559,8 @@ html.domo-dashboard-embed .page {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 12px 24px;
-  font: 600 14px/1 var(--font-base);
+  padding: 8px 16px;
+  font: 600 13px/1 var(--font-base);
   color: var(--muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -894,7 +894,7 @@ html.domo-dashboard-embed .page {
   border-collapse: separate;
   border-spacing: 0;
   background: var(--white);
-  font-size: 14px;
+  font-size: 13px;
   table-layout: auto;
 }
 
@@ -929,10 +929,10 @@ html.domo-dashboard-embed .page {
 
 .table th,
 .table td {
-  padding: 14px 16px;
+  padding: 10px 12px;
   text-align: left;
   border-bottom: 1px solid var(--line);
-  overflow: hidden;
+  overflow: visible;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.5;
@@ -1915,15 +1915,16 @@ html.domo-dashboard-embed .page {
   color: var(--stoa-green-dark);
   border: 1px solid var(--stoa-green-light);
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 4px 10px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(126, 138, 107, 0.15);
   transition: all var(--transition-fast);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  overflow: visible;
 }
 
 .badge:hover {
@@ -3053,6 +3054,22 @@ td.empty {
   margin-top: 12px;
 }
 
+.sub-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sub-table .badge {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+
+.sub-table th,
+.sub-table td {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
 .category-card-expand .sub-table-wrap {
   margin: 0 -20px -20px;
   border-top: 1px solid var(--line);
@@ -3166,45 +3183,49 @@ td.empty {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
-  gap: 6px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
 }
 
 .detail-field {
-  background: var(--surface-2);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-height: 0;
+  background: var(--surface);
+  padding: 10px 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .detail-field-label,
 .detail-label {
-  display: inline;
+  display: block;
   font-size: 10px;
   font-weight: 600;
-  color: var(--muted);
   text-transform: uppercase;
-  flex-shrink: 0;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 3px;
   white-space: nowrap;
-  letter-spacing: 0.04em;
 }
 
 .detail-field-value,
 .detail-value {
-  display: inline;
+  display: block;
   font-size: 13px;
-  font-weight: 600;
   color: var(--ink);
   word-break: break-word;
 }
 
 .detail-field-full {
   grid-column: 1 / -1;
+}
+
+.detail-field .badge,
+.detail-field .days-badge {
+  white-space: nowrap;
+  overflow: visible;
 }
 
 /* =========================================================
@@ -3328,7 +3349,7 @@ td.empty {
   .renewals-cell:nth-child(7)::before { content: 'Auto-Renew'; }
 
   .detail-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .chart-grid {
@@ -3599,8 +3620,7 @@ td.empty {
   }
 
   .detail-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .chart-container {

@@ -3273,14 +3273,14 @@ function renderDetailFields(c) {
     ['Term', (c.ContractTermMonths || c.TermMonths) ? (c.ContractTermMonths || c.TermMonths) + ' months' : '—'],
     ['Start Date', formatDate(c.StartDate)],
     [
-      'Expiration Date',
+      'Expiration',
       formatDate(c.ExpirationDate) +
-      (hasExpiry ? ` <span class="days-badge ${getUrgencyClass(days)}">${days <= 0 ? 'EXPIRED' : days + ' days'}</span>` : '')
+      (hasExpiry ? ` <span class="days-badge ${getUrgencyClass(days)}" style="white-space:nowrap">${days <= 0 ? 'Expired' : days + 'd'}</span>` : '')
     ],
     ['Notice Period', (c.NoticePeriodDays || c.NoticePeriod) ? (c.NoticePeriodDays || c.NoticePeriod) + ' days' : '—'],
     ['Auto-Renew', getAutoRenewBadge(c.AutoRenew)],
     ['Renewal Type', escapeHtml(c.RenewalTermType || '—')],
-    ['Non-Cancellable', (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? '<span class="badge badge-danger">Non-Cancellable</span>' : 'No'],
+    ['Non-Cancellable', (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? '<span class="badge badge-danger">Non-Cancellable</span>' : 'Cancellable'],
     [
       'Termination Fee',
       (c.TerminationFee === true || c.TerminationFee === 1)
