@@ -904,7 +904,7 @@ function renderRenewalsList(searchQuery) {
     ${upcoming.map(c => {
       const days = daysUntil(c.ExpirationDate);
       const urg = getUrgencyClass(days);
-      return `<div class="renewals-row ${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click to view details">
+      return `<div class="renewals-row" data-urgency="${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click to view details">
         <span class="renewals-cell">${escapeHtml(projectName(c.ProjectId))}</span>
         <span class="renewals-cell">${escapeHtml(vendorName(c.VendorId))}</span>
         <span class="renewals-cell">${escapeHtml(c.Description || '—')}</span>
@@ -1468,7 +1468,7 @@ function buildContractSubTable(contracts, hideColumn) {
         const urg = isActive && days !== Infinity ? getUrgencyClass(days) : '';
         const daysDisplay = days === Infinity ? '—' : (days <= 0 ? 'Expired' : days + 'd');
         const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
-        return `<tr class="contract-row ${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click for details">
+        return `<tr class="contract-row" data-urgency="${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click for details">
           <td data-label="Description">${escapeHtml(c.Description || '—')}${ncBadge}</td>
           ${showVendor ? `<td data-label="Vendor">${escapeHtml(vendorName(c.VendorId))}</td>` : ''}
           ${showCategory ? `<td data-label="Category">${escapeHtml(categoryName(c.CategoryId))}</td>` : ''}
@@ -1476,7 +1476,7 @@ function buildContractSubTable(contracts, hideColumn) {
           <td class="num" data-label="Monthly Cost">${formatCurrency(c.MonthlyCost)}</td>
           <td data-label="Billing">${escapeHtml(c.BillingFrequency || '—')}</td>
           <td data-label="Expiration">${formatDateShort(c.ExpirationDate)}</td>
-          <td class="${urg}" data-label="Days">${daysDisplay}</td>
+          <td class="days-cell ${urg}" data-label="Days">${daysDisplay}</td>
           <td data-label="Auto-Renew">${getAutoRenewBadge(c.AutoRenew)}</td>
           <td data-label="Escalation">${escapeHtml(c.AnnualEscalation || '—')}</td>
           <td data-label="Signed By">${escapeHtml(c.SignedBy || '—')}</td>
@@ -1836,12 +1836,12 @@ function renderExpiryTable(globalSearch) {
     const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
     const renewType = c.RenewalTermType || '—';
 
-    return `<tr class="${urg}">
+    return `<tr data-urgency="${urg}">
       <td data-label="Property">${escapeHtml(c.Property)}</td>
       <td data-label="Vendor">${escapeHtml(c.Vendor)}</td>
       <td data-label="Category">${escapeHtml(c.Category)}</td>
       <td data-label="Expiration">${formatDateShort(c.ExpirationDate)}</td>
-      <td class="num" data-label="Days Left">
+      <td class="num days-cell" data-label="Days Left">
         <span class="days-badge ${urg}">${days <= 0 ? 'EXPIRED' : days + 'd'}</span>
         ${noticeWarning ? '<span class="notice-flag" title="Within notice period">!</span>' : ''}
       </td>

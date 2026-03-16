@@ -967,10 +967,6 @@ html.domo-dashboard-embed .page {
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.table tbody tr:nth-child(even) {
-  background: var(--surface-2);
-}
-
 .table tbody tr {
   transition: background-color var(--transition-fast);
 }
@@ -1989,35 +1985,41 @@ html.domo-dashboard-embed .page {
    Urgency Indicators
    ========================================================= */
 
-.urgency-critical {
+.days-cell.urgency-critical,
+.days-badge.urgency-critical {
   color: var(--error);
   font-weight: 700;
 }
 
-.urgency-critical::before {
-  content: '●';
-  margin-right: 6px;
-  animation: pulse 1.5s infinite;
-}
-
-.urgency-warning {
+.days-cell.urgency-warning,
+.days-badge.urgency-warning {
   color: var(--warning);
   font-weight: 600;
 }
 
-.urgency-warning::before {
-  content: '●';
-  margin-right: 6px;
-}
-
-.urgency-ok {
+.days-cell.urgency-ok,
+.days-badge.urgency-ok {
   color: var(--success);
   font-weight: 500;
 }
 
-.urgency-ok::before {
-  content: '●';
-  margin-right: 6px;
+tr[data-urgency="urgency-critical"] {
+  border-left: 3px solid var(--error);
+}
+tr[data-urgency="urgency-warning"] {
+  border-left: 3px solid var(--warning);
+}
+tr[data-urgency="urgency-ok"] {
+  border-left: 3px solid var(--success);
+}
+div[data-urgency="urgency-critical"] {
+  border-left: 3px solid var(--error);
+}
+div[data-urgency="urgency-warning"] {
+  border-left: 3px solid var(--warning);
+}
+div[data-urgency="urgency-ok"] {
+  border-left: 3px solid var(--success);
 }
 
 .urgency-flag {
@@ -2919,17 +2921,17 @@ td.empty {
   color: #065f46;
 }
 
-.renewals-row.urgency-critical .days-badge {
+.renewals-row[data-urgency="urgency-critical"] .days-badge {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.renewals-row.urgency-warning .days-badge {
+.renewals-row[data-urgency="urgency-warning"] .days-badge {
   background: #fef3c7;
   color: #92400e;
 }
 
-.renewals-row.urgency-ok .days-badge {
+.renewals-row[data-urgency="urgency-ok"] .days-badge {
   background: #d1fae5;
   color: #065f46;
 }
@@ -2975,6 +2977,7 @@ td.empty {
 .sub-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  background: var(--surface);
 }
 
 .sub-table .badge {
@@ -2986,6 +2989,19 @@ td.empty {
 .sub-table td {
   padding: 8px 10px;
   font-size: 12px;
+}
+
+.sub-table tbody tr {
+  background: var(--white);
+}
+.sub-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.detail-row td,
+.category-detail-row td {
+  padding: 0 !important;
+  background: var(--surface-2);
 }
 
 /* =========================================================
