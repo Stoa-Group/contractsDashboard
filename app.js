@@ -82,6 +82,10 @@ let renewingContractId = null;
 let detailContractId = null;
 let pendingFiles = [];
 
+let isAuthenticated = false;
+let isEditMode = false;
+let currentUser = null;
+
 // ============================================================
 //  UTILITY FUNCTIONS
 // ============================================================
@@ -168,8 +172,8 @@ function getStatusBadge(status) {
 function getAutoRenewBadge(autoRenew) {
   const isAuto = autoRenew === true || autoRenew === 1 || autoRenew === 'Yes' || autoRenew === 'true';
   return isAuto
-    ? '<span class="badge badge-success">Yes</span>'
-    : '<span class="badge badge-default">No</span>';
+    ? '<span class="badge badge-success">Auto-Renew</span>'
+    : '<span class="badge badge-default">No Auto-Renew</span>';
 }
 
 function isAutoRenew(c) {
@@ -182,6 +186,7 @@ function escapeHtml(s) {
   d.textContent = String(s);
   return d.innerHTML;
 }
+const esc = escapeHtml;
 
 function showToast(message, type = 'info') {
   const container = $('#toast-container');
@@ -353,7 +358,13 @@ function contractMatchesSearch(c, query) {
     categoryName(c.CategoryId),
     c.ContractType,
     c.Status,
-    c.Notes
+    c.Notes,
+    c.ContractNumber,
+    c.SignedBy,
+    c.ContractScope,
+    c.AccountRepresentative,
+    c.RenewalTermType,
+    c.ServiceFrequency
   ];
   return fields.some(f => f && String(f).toLowerCase().includes(q));
 }
@@ -515,6 +526,157 @@ async function refreshData() {
 }
 
 // ============================================================
+//  AUTHENTICATION
+// ============================================================
+
+async function initializeAuth() {
+  const storedToken = localStorage.getItem('authToken');
+  if (storedToken) {
+    try {
+      API.setAuthToken(storedToken);
+      const result = await API.verifyAuth(storedToken);
+      if (result && result.success) {
+        isAuthenticated = true;
+        currentUser = result.data?.user || result.user || { username: 'Admin' };
+        updateAuthUI();
+        console.log('[Auth] Restored session for', currentUser.username || currentUser.email);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Auth] Stored token invalid, clearing.');
+      localStorage.removeItem('authToken');
+      API.clearAuthToken();
+    }
+  }
+
+  if (DOMO) {
+    try {
+      const domoUser = await getDomoCurrentUser();
+      if (domoUser && domoUser.email) {
+        const result = await API.loginWithDomo(domoUser);
+        if (result && result.success && result.data?.token) {
+          localStorage.setItem('authToken', result.data.token);
+          isAuthenticated = true;
+          currentUser = result.data.user || { username: domoUser.name || domoUser.email };
+          updateAuthUI();
+          console.log('[Auth] Domo SSO login for', currentUser.username || currentUser.email);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[Auth] Domo SSO failed:', e.message);
+    }
+  }
+
+  updateAuthUI();
+}
+
+async function getDomoCurrentUser() {
+  const params = new URLSearchParams(window.location.search);
+  const email = params.get('userEmail');
+  const name = params.get('userName');
+  const userId = params.get('userId');
+  if (email) return { email, name, userId };
+
+  if (DOMO && DOMO.env) {
+    const domoUserId = DOMO.env.userId;
+    const domoEmail = DOMO.env.email;
+    if (domoEmail) return { email: domoEmail, name: '', userId: domoUserId };
+    if (domoUserId) {
+      try {
+        const resp = await fetch(`/api/content/v1/users/${domoUserId}`);
+        const data = await resp.json();
+        if (data.emailAddress) return { email: data.emailAddress, name: data.displayName || '', userId: domoUserId };
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = ($('#loginUsername') || {}).value || '';
+  const password = ($('#loginPassword') || {}).value || '';
+  const errorEl = $('#loginError');
+
+  if (!username || !password) {
+    if (errorEl) { errorEl.textContent = 'Username and password required.'; errorEl.style.display = 'block'; }
+    return;
+  }
+
+  try {
+    if (errorEl) errorEl.style.display = 'none';
+    const result = await API.login(username, password);
+    if (result && result.success && result.data?.token) {
+      localStorage.setItem('authToken', result.data.token);
+      isAuthenticated = true;
+      currentUser = result.data.user || { username };
+      updateAuthUI();
+      closeModalAnimated($('#login-modal'));
+      showToast('Logged in as ' + (currentUser.username || currentUser.email || 'Admin'), 'success');
+      if ($('#loginForm')) $('#loginForm').reset();
+    } else {
+      throw new Error(result?.error?.message || result?.message || 'Login failed');
+    }
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = err.message || 'Invalid credentials.';
+      errorEl.style.display = 'block';
+    }
+  }
+}
+
+function handleLogout() {
+  isAuthenticated = false;
+  isEditMode = false;
+  currentUser = null;
+  localStorage.removeItem('authToken');
+  API.clearAuthToken();
+  updateAuthUI();
+  renderedTabs.clear();
+  renderCurrentTab();
+  showToast('Logged out successfully.', 'info');
+}
+
+function toggleEditMode() {
+  if (!isAuthenticated) return;
+  isEditMode = !isEditMode;
+  updateAuthUI();
+  renderedTabs.clear();
+  renderCurrentTab();
+}
+
+function updateAuthUI() {
+  const adminBadge = $('#adminBadge');
+  const loginBtn = $('#loginBtn');
+  const editModeBtn = $('#editModeBtn');
+
+  if (isAuthenticated) {
+    if (adminBadge) adminBadge.style.display = '';
+    if (loginBtn) { loginBtn.textContent = 'Logout'; loginBtn.title = 'Click to log out'; }
+    if (editModeBtn) editModeBtn.style.display = '';
+    document.body.classList.add('admin-authenticated');
+  } else {
+    if (adminBadge) adminBadge.style.display = 'none';
+    if (loginBtn) { loginBtn.textContent = 'Login'; loginBtn.title = 'Click to log in'; }
+    if (editModeBtn) editModeBtn.style.display = 'none';
+    document.body.classList.remove('admin-authenticated');
+  }
+
+  if (isEditMode && isAuthenticated) {
+    if (editModeBtn) { editModeBtn.textContent = 'Exit Edit Mode'; editModeBtn.classList.add('active'); }
+    document.body.classList.add('admin-edit-mode');
+  } else {
+    if (editModeBtn) { editModeBtn.textContent = 'Edit Mode'; editModeBtn.classList.remove('active'); }
+    document.body.classList.remove('admin-edit-mode');
+  }
+}
+
+function canEdit() {
+  return isAuthenticated && isEditMode;
+}
+
+// ============================================================
 //  INITIALIZATION
 // ============================================================
 
@@ -530,6 +692,11 @@ async function init() {
     setLoadingProgress(5);
 
     await loadAllData();
+
+    setLoadingProgress(85);
+    setLoadingStatus('Checking authentication…');
+
+    await initializeAuth();
 
     setLoadingProgress(92);
     setLoadingStatus('Rendering dashboard…');
@@ -620,12 +787,19 @@ function renderKPIs() {
     ? (analyticsSummary.expiredCount ?? analyticsSummary.expired ?? 0)
     : allContracts.filter(c => (c.Status || '').toLowerCase() === 'expired').length;
 
+  const nonCancellable = active.filter(c => c.IsNonCancellable === true || c.IsNonCancellable === 1).length;
+  const withEscalation = active.filter(c => c.AnnualEscalation).length;
+  const totalSetupFees = active.reduce((s, c) => s + (parseFloat(c.OneTimeSetupFee) || 0), 0);
+
   setKPI('#kpi-total', totalActive.toLocaleString());
   setKPI('#kpi-monthly-spend', formatCurrencyWhole(monthlySpend));
   setKPI('#kpi-annual-spend', formatCurrencyWhole(annualSpend));
   setKPI('#kpi-expiring-30', expiring30, expiring30 > 0 ? 'kpi-alert' : '');
   setKPI('#kpi-expiring-60', expiring60, expiring60 > 0 ? 'kpi-attention' : '');
   setKPI('#kpi-expired', expired, expired > 0 ? 'kpi-danger' : '');
+  setKPI('#kpi-non-cancellable', nonCancellable, nonCancellable > 0 ? 'kpi-attention' : '');
+  setKPI('#kpi-with-escalation', withEscalation);
+  setKPI('#kpi-setup-fees', formatCurrencyWhole(totalSetupFees));
 }
 
 function setKPI(selector, value, extraClass) {
@@ -645,9 +819,6 @@ function renderDashboard(searchQuery) {
   renderKPIs();
   renderRenewalsList(searchQuery);
   renderRecentActivity(searchQuery);
-  renderSpendByCategoryChart();
-  renderSpendByPropertyChart();
-  renderSpendTrendChart();
 }
 
 function renderRenewalsList(searchQuery) {
@@ -876,7 +1047,7 @@ function renderSpendByCategoryChart() {
         ...getChartDefaults().plugins,
         legend: {
           ...getChartDefaults().plugins.legend,
-          position: window.innerWidth < 768 ? 'bottom' : 'right'
+          position: window.innerWidth < 1024 ? 'bottom' : 'right'
         },
         tooltip: {
           ...getChartDefaults().plugins.tooltip,
@@ -1138,15 +1309,15 @@ function renderPropertyView(globalSearch) {
     const unitsLine = r.Units > 0 ? ` &middot; ${r.Units} ${pluralize(r.Units, 'unit')}` : '';
 
     return `<tr class="property-row expandable" data-project-id="${r.ProjectId}">
-      <td>
+      <td data-label="Property">
         <strong>${escapeHtml(r.Property)}</strong>
         ${locationLine ? `<br><small class="subtle">${escapeHtml(locationLine)}${unitsLine}</small>` : ''}
       </td>
-      <td class="num">${r.ContractCount}</td>
-      <td class="num">${formatCurrency(r.MonthlySpend)}</td>
-      <td class="num">${formatCurrency(r.AnnualSpend)}</td>
-      <td class="num ${r.Expiring > 0 ? getUrgencyClass(r.Status === 'critical' ? 15 : 45) : ''}">${r.Expiring > 0 ? r.Expiring : '—'}</td>
-      <td>${statusBadge}</td>
+      <td class="num" data-label="Contracts">${r.ContractCount}</td>
+      <td class="num" data-label="Monthly Spend">${formatCurrency(r.MonthlySpend)}</td>
+      <td class="num" data-label="Annual Spend">${formatCurrency(r.AnnualSpend)}</td>
+      <td class="num ${r.Expiring > 0 ? getUrgencyClass(r.Status === 'critical' ? 15 : 45) : ''}" data-label="Expiring Soon">${r.Expiring > 0 ? r.Expiring : '—'}</td>
+      <td data-label="Status">${statusBadge}</td>
     </tr>
     <tr class="detail-row" data-project-detail="${r.ProjectId}" style="display:none;">
       <td colspan="6">
@@ -1163,7 +1334,9 @@ function renderPropertyView(globalSearch) {
       const detailRow = tbody.querySelector(`[data-project-detail="${pid}"]`);
       if (detailRow) {
         const isOpen = detailRow.style.display !== 'none';
-        detailRow.style.display = isOpen ? 'none' : 'table-row';
+        const showVal = window.innerWidth <= 768 ? 'block' : 'table-row';
+        detailRow.style.display = isOpen ? 'none' : showVal;
+        detailRow.classList.toggle('open', !isOpen);
         row.classList.toggle('expanded', !isOpen);
       }
     });
@@ -1198,6 +1371,8 @@ function buildContractSubTable(contracts) {
         <th>Expiration</th>
         <th>Days</th>
         <th>Auto-Renew</th>
+        <th>Escalation</th>
+        <th>Signed By</th>
       </tr>
     </thead>
     <tbody>
@@ -1206,16 +1381,19 @@ function buildContractSubTable(contracts) {
         const isActive = (c.Status || '').toLowerCase() === 'active';
         const urg = isActive && days !== Infinity ? getUrgencyClass(days) : '';
         const daysDisplay = days === Infinity ? '—' : (days <= 0 ? 'Expired' : days + 'd');
+        const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
         return `<tr class="contract-row ${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click for details">
-          <td>${escapeHtml(c.Description || '—')}</td>
-          <td>${escapeHtml(vendorName(c.VendorId))}</td>
-          <td>${escapeHtml(categoryName(c.CategoryId))}</td>
-          <td>${getStatusBadge(c.Status)}</td>
-          <td class="num">${formatCurrency(c.MonthlyCost)}</td>
-          <td>${escapeHtml(c.BillingFrequency || '—')}</td>
-          <td>${formatDateShort(c.ExpirationDate)}</td>
-          <td class="${urg}">${daysDisplay}</td>
-          <td>${getAutoRenewBadge(c.AutoRenew)}</td>
+          <td data-label="Description">${escapeHtml(c.Description || '—')}${ncBadge}</td>
+          <td data-label="Vendor">${escapeHtml(vendorName(c.VendorId))}</td>
+          <td data-label="Category">${escapeHtml(categoryName(c.CategoryId))}</td>
+          <td data-label="Status">${getStatusBadge(c.Status)}</td>
+          <td class="num" data-label="Monthly Cost">${formatCurrency(c.MonthlyCost)}</td>
+          <td data-label="Billing">${escapeHtml(c.BillingFrequency || '—')}</td>
+          <td data-label="Expiration">${formatDateShort(c.ExpirationDate)}</td>
+          <td class="${urg}" data-label="Days">${daysDisplay}</td>
+          <td data-label="Auto-Renew">${getAutoRenewBadge(c.AutoRenew)}</td>
+          <td data-label="Escalation">${escapeHtml(c.AnnualEscalation || '—')}</td>
+          <td data-label="Signed By">${escapeHtml(c.SignedBy || '—')}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -1419,18 +1597,18 @@ function renderVendorView(globalSearch) {
 
   tbody.innerHTML = vendorRows.map(r => `
     <tr class="vendor-row expandable" data-vendor-id="${r.VendorId}">
-      <td>
+      <td data-label="Vendor">
         <strong>${escapeHtml(r.VendorName)}</strong>
         ${r.Website ? `<br><a href="${escapeHtml(r.Website)}" target="_blank" rel="noopener" class="subtle-link">${escapeHtml(r.Website.replace(/^https?:\/\//, ''))}</a>` : ''}
       </td>
-      <td>${escapeHtml(r.ContactName)}</td>
-      <td>${r.Email !== '—' ? `<a href="mailto:${escapeHtml(r.Email)}" class="subtle-link">${escapeHtml(r.Email)}</a>` : '—'}</td>
-      <td>${escapeHtml(r.Phone)}</td>
-      <td class="num">${r.ContractCount}${r.ActiveCount < r.ContractCount ? ` <small class="subtle">(${r.ActiveCount} active)</small>` : ''}</td>
-      <td class="num">${formatCurrency(r.TotalSpend)}</td>
-      <td class="actions-cell" onclick="event.stopPropagation()">
-        <button class="btn btn-xs btn-edit-vendor" data-vendor-id="${r.VendorId}" title="Edit vendor">Edit</button>
-        <button class="btn btn-xs btn-danger btn-delete-vendor" data-vendor-id="${r.VendorId}" title="Delete vendor">Del</button>
+      <td data-label="Contact">${escapeHtml(r.ContactName)}</td>
+      <td data-label="Email">${r.Email !== '—' ? `<a href="mailto:${escapeHtml(r.Email)}" class="subtle-link">${escapeHtml(r.Email)}</a>` : '—'}</td>
+      <td data-label="Phone">${escapeHtml(r.Phone)}</td>
+      <td class="num" data-label="Contracts">${r.ContractCount}${r.ActiveCount < r.ContractCount ? ` <small class="subtle">(${r.ActiveCount} active)</small>` : ''}</td>
+      <td class="num" data-label="Annual Spend">${formatCurrency(r.TotalSpend)}</td>
+      <td class="actions-cell" data-label="" onclick="event.stopPropagation()">
+        ${canEdit() ? `<button class="btn btn-xs btn-edit-vendor" data-vendor-id="${r.VendorId}" title="Edit vendor">Edit</button>
+        <button class="btn btn-xs btn-danger btn-delete-vendor" data-vendor-id="${r.VendorId}" title="Delete vendor">Del</button>` : ''}
       </td>
     </tr>
     <tr class="detail-row" data-vendor-detail="${r.VendorId}" style="display:none;">
@@ -1449,7 +1627,9 @@ function renderVendorView(globalSearch) {
       const detailRow = tbody.querySelector(`[data-vendor-detail="${vid}"]`);
       if (detailRow) {
         const isOpen = detailRow.style.display !== 'none';
-        detailRow.style.display = isOpen ? 'none' : 'table-row';
+        const showVal = window.innerWidth <= 768 ? 'block' : 'table-row';
+        detailRow.style.display = isOpen ? 'none' : showVal;
+        detailRow.classList.toggle('open', !isOpen);
         row.classList.toggle('expanded', !isOpen);
       }
     });
@@ -1521,7 +1701,7 @@ function renderExpiryTable(globalSearch) {
   updateSortIndicators('expiry-table', sortKey, sortDir);
 
   if (expiring.length === 0) {
-    tbody.innerHTML = `<tr><td class="empty" colspan="8">No contracts expiring in the next ${timeframe} days.</td></tr>`;
+    tbody.innerHTML = `<tr><td class="empty" colspan="9">No contracts expiring in the next ${timeframe} days.</td></tr>`;
     return;
   }
 
@@ -1531,20 +1711,24 @@ function renderExpiryTable(globalSearch) {
     const noticeDays = num(c.NoticePeriodDays || c.NoticePeriod || 0);
     const noticeWarning = noticeDays > 0 && days <= noticeDays && days > 0;
 
+    const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
+    const renewType = c.RenewalTermType || '—';
+
     return `<tr class="${urg}">
-      <td>${escapeHtml(c.Property)}</td>
-      <td>${escapeHtml(c.Vendor)}</td>
-      <td>${escapeHtml(c.Category)}</td>
-      <td>${formatDateShort(c.ExpirationDate)}</td>
-      <td class="num">
+      <td data-label="Property">${escapeHtml(c.Property)}</td>
+      <td data-label="Vendor">${escapeHtml(c.Vendor)}</td>
+      <td data-label="Category">${escapeHtml(c.Category)}</td>
+      <td data-label="Expiration">${formatDateShort(c.ExpirationDate)}</td>
+      <td class="num" data-label="Days Left">
         <span class="days-badge ${urg}">${days <= 0 ? 'EXPIRED' : days + 'd'}</span>
         ${noticeWarning ? '<span class="notice-flag" title="Within notice period">!</span>' : ''}
       </td>
-      <td>${getAutoRenewBadge(c.AutoRenew)}</td>
-      <td class="num">${noticeDays > 0 ? noticeDays + 'd' : '—'}</td>
-      <td class="actions-cell">
+      <td data-label="Auto-Renew">${getAutoRenewBadge(c.AutoRenew)}${ncBadge}</td>
+      <td class="num" data-label="Notice">${noticeDays > 0 ? noticeDays + 'd' : '—'}</td>
+      <td data-label="Renewal Type">${escapeHtml(renewType)}</td>
+      <td class="actions-cell" data-label="">
         <button class="btn btn-xs" onclick="openDetailModal(${c.ContractId || c.Id})">View</button>
-        <button class="btn btn-xs" onclick="openRenewModal(${c.ContractId || c.Id})">Renew</button>
+        ${canEdit() ? `<button class="btn btn-xs" onclick="openRenewModal(${c.ContractId || c.Id})">Renew</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -1630,7 +1814,7 @@ function renderExpiryTimeline(globalSearch) {
 //  ANALYTICS TAB
 // ============================================================
 
-let analyticsSubView = 'spend-over-time';
+let analyticsSubView = 'spend-by-category';
 
 function renderAnalyticsView() {
   showAnalyticsSubView(analyticsSubView);
@@ -1649,10 +1833,18 @@ function showAnalyticsSubView(view) {
   });
 
   switch (view) {
-    case 'spend-over-time':  renderAnalyticsSpendOverTime(); break;
-    case 'cost-per-unit':    renderAnalyticsCostPerUnit(); break;
-    case 'category-trends':  renderAnalyticsCategoryTrends(); break;
-    case 'vendor-analysis':  renderAnalyticsVendorConcentration(); break;
+    case 'spend-by-category': renderSpendByCategoryChart(); break;
+    case 'spend-by-property': renderSpendByPropertyChart(); break;
+    case 'spend-over-time':   renderAnalyticsSpendOverTime(); break;
+    case 'cost-per-unit':     renderAnalyticsCostPerUnit(); break;
+    case 'category-trends':   renderAnalyticsCategoryTrends(); break;
+    case 'vendor-analysis':   renderAnalyticsVendorConcentration(); break;
+    case 'service-matrix':    renderServiceMatrix(); break;
+    case 'completeness':      renderCompleteness(); break;
+    case 'service-coverage':  renderServiceCoverage(); break;
+    case 'vendor-dependency': renderVendorDependency(); break;
+    case 'renewal-pipeline':  renderRenewalPipeline(); break;
+    case 'cost-benchmarks':   renderCostBenchmarks(); break;
   }
 }
 
@@ -1958,6 +2150,531 @@ function renderAnalyticsVendorConcentration() {
 }
 
 // ============================================================
+//  ENHANCED ANALYTICS – SERVICE MATRIX
+// ============================================================
+
+async function renderServiceMatrix() {
+  const container = document.getElementById('service-matrix-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading service matrix…</p>';
+
+  try {
+    const res = await API.getServiceMatrix();
+    const rows = (res && res.data) || [];
+
+    if (rows.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No active contracts found.</p>';
+      return;
+    }
+
+    const categories = [...new Set(rows.map(r => r.CategoryName || 'Uncategorized'))].sort();
+    const properties = [...new Set(rows.map(r => r.ProjectName || 'Unknown'))].sort();
+
+    const lookup = {};
+    rows.forEach(r => {
+      const key = (r.CategoryName || 'Uncategorized') + '||' + (r.ProjectName || 'Unknown');
+      if (!lookup[key]) lookup[key] = [];
+      lookup[key].push(r);
+    });
+
+    let html = `
+      <div class="matrix-legend">
+        <span class="matrix-legend-item"><span class="matrix-legend-swatch" style="background:#dcfce7;"></span> Covered</span>
+        <span class="matrix-legend-item"><span class="matrix-legend-swatch" style="background:#fee2e2;"></span> Missing</span>
+        <span class="matrix-legend-item"><span class="matrix-legend-swatch" style="background:#fef9c3;"></span> No cost data</span>
+      </div>
+      <table class="service-matrix">
+        <thead><tr><th>Service</th>`;
+
+    properties.forEach(p => {
+      const short = p.length > 18 ? p.substring(0, 16) + '…' : p;
+      html += `<th title="${esc(p)}">${esc(short)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    categories.forEach(cat => {
+      html += `<tr><td>${esc(cat)}</td>`;
+      properties.forEach(prop => {
+        const key = cat + '||' + prop;
+        const contracts = lookup[key];
+        if (!contracts || contracts.length === 0) {
+          html += '<td class="matrix-cell matrix-cell-empty">—</td>';
+        } else {
+          const c = contracts[0];
+          const cost = parseFloat(c.MonthlyCost);
+          const hasCost = Number.isFinite(cost) && cost > 0;
+          const bgClass = hasCost ? '' : 'style="background:#fef9c3;"';
+          html += `<td class="matrix-cell" ${bgClass}>
+            <div class="matrix-cell-vendor">${esc(c.VendorName || '—')}</div>
+            <div class="matrix-cell-cost">${hasCost ? formatCurrency(cost) + '/mo' : 'No cost'}</div>
+            ${contracts.length > 1 ? '<div class="matrix-cell-cost">+' + (contracts.length - 1) + ' more</div>' : ''}
+          </td>`;
+        }
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Service Matrix error:', err);
+    container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load service matrix.</p>';
+  }
+}
+
+// ============================================================
+//  ENHANCED ANALYTICS – COMPLETENESS SCORECARD
+// ============================================================
+
+async function renderCompleteness() {
+  const container = document.getElementById('completeness-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading completeness data…</p>';
+
+  try {
+    const res = await API.getCompleteness();
+    const rows = (res && res.data) || [];
+
+    if (rows.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No data available.</p>';
+      return;
+    }
+
+    const fields = ['HasCost', 'HasStartDate', 'HasEndDate', 'HasNotice', 'HasBilling'];
+    const fieldLabels = { HasCost: 'Cost', HasStartDate: 'Start Date', HasEndDate: 'End Date', HasNotice: 'Notice', HasBilling: 'Billing' };
+
+    let totalScore = 0;
+    let totalMax = 0;
+    let fullyComplete = 0;
+
+    const cards = rows.map(row => {
+      const total = parseInt(row.TotalContracts) || 1;
+      let score = 0;
+      const bars = fields.map(f => {
+        const val = parseInt(row[f]) || 0;
+        const pct = Math.round((val / total) * 100);
+        score += pct;
+        const cls = pct >= 80 ? 'fill-high' : pct >= 40 ? 'fill-med' : 'fill-low';
+        return `<div class="completeness-bar-row">
+          <span class="completeness-bar-label">${fieldLabels[f]}</span>
+          <div class="completeness-bar-track"><div class="completeness-bar-fill ${cls}" style="width:${pct}%"></div></div>
+          <span class="completeness-bar-val">${val}/${total}</span>
+        </div>`;
+      }).join('');
+
+      const avg = Math.round(score / fields.length);
+      totalScore += avg;
+      totalMax += 100;
+      if (avg >= 95) fullyComplete++;
+      const scoreCls = avg >= 80 ? 'score-high' : avg >= 40 ? 'score-med' : 'score-low';
+
+      return `<div class="completeness-card">
+        <div class="completeness-card-header">
+          <span class="completeness-card-title">${esc(row.ProjectName)}</span>
+          <span class="completeness-card-score ${scoreCls}">${avg}%</span>
+        </div>
+        ${bars}
+      </div>`;
+    }).join('');
+
+    const portfolioAvg = rows.length > 0 ? Math.round(totalScore / rows.length) : 0;
+
+    const summary = `<div class="completeness-summary">
+      <div class="completeness-summary-stat">
+        <div class="stat-value">${portfolioAvg}%</div>
+        <div class="stat-label">Portfolio Avg</div>
+      </div>
+      <div class="completeness-summary-stat">
+        <div class="stat-value">${fullyComplete}</div>
+        <div class="stat-label">Fully Complete</div>
+      </div>
+      <div class="completeness-summary-stat">
+        <div class="stat-value">${rows.length}</div>
+        <div class="stat-label">Properties</div>
+      </div>
+    </div>`;
+
+    container.innerHTML = summary + '<div class="completeness-grid">' + cards + '</div>';
+  } catch (err) {
+    console.error('Completeness error:', err);
+    container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load completeness data.</p>';
+  }
+}
+
+// ============================================================
+//  ENHANCED ANALYTICS – SERVICE COVERAGE
+// ============================================================
+
+async function renderServiceCoverage() {
+  const container = document.getElementById('service-coverage-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading service coverage…</p>';
+
+  try {
+    const res = await API.getServiceCoverage();
+    const rows = (res && res.data) || [];
+
+    if (rows.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No data available.</p>';
+      return;
+    }
+
+    const categories = [...new Set(rows.map(r => r.CategoryName))].sort();
+    const properties = [...new Set(rows.map(r => r.ProjectName))].sort();
+
+    const lookup = {};
+    rows.forEach(r => {
+      lookup[r.CategoryName + '||' + r.ProjectName] = r;
+    });
+
+    const catStats = {};
+    categories.forEach(cat => {
+      let covered = 0, total = properties.length, costs = [];
+      properties.forEach(prop => {
+        const d = lookup[cat + '||' + prop];
+        if (d && parseInt(d.ContractCount) > 0) {
+          covered++;
+          const spend = parseFloat(d.MonthlySpend) || 0;
+          if (spend > 0) costs.push(spend);
+        }
+      });
+      catStats[cat] = { covered, total, costs };
+    });
+
+    let totalCovered = 0, totalCells = 0;
+    Object.values(catStats).forEach(s => { totalCovered += s.covered; totalCells += s.total; });
+
+    const stats = `<div class="coverage-stats">
+      <div class="coverage-stat-card">
+        <div class="stat-value">${Math.round((totalCovered / Math.max(totalCells, 1)) * 100)}%</div>
+        <div class="stat-label">Overall Coverage</div>
+      </div>
+      <div class="coverage-stat-card">
+        <div class="stat-value">${totalCells - totalCovered}</div>
+        <div class="stat-label">Gaps</div>
+      </div>
+      <div class="coverage-stat-card">
+        <div class="stat-value">${categories.length}</div>
+        <div class="stat-label">Service Types</div>
+      </div>
+      <div class="coverage-stat-card">
+        <div class="stat-value">${properties.length}</div>
+        <div class="stat-label">Properties</div>
+      </div>
+    </div>`;
+
+    let html = '<div class="coverage-wrap"><table class="coverage-table"><thead><tr><th>Service</th>';
+    properties.forEach(p => {
+      const short = p.length > 14 ? p.substring(0, 12) + '…' : p;
+      html += `<th title="${esc(p)}">${esc(short)}</th>`;
+    });
+    html += '<th>Coverage</th></tr></thead><tbody>';
+
+    categories.forEach(cat => {
+      const s = catStats[cat];
+      html += `<tr><td>${esc(cat)}</td>`;
+      properties.forEach(prop => {
+        const d = lookup[cat + '||' + prop];
+        const count = d ? parseInt(d.ContractCount) || 0 : 0;
+        const spend = d ? parseFloat(d.MonthlySpend) || 0 : 0;
+
+        if (count === 0) {
+          html += '<td class="coverage-cell missing">—</td>';
+        } else if (spend === 0) {
+          html += '<td class="coverage-cell underfunded">No $</td>';
+        } else {
+          html += `<td class="coverage-cell covered">${formatCurrencyShort(spend)}</td>`;
+        }
+      });
+      const pct = Math.round((s.covered / Math.max(s.total, 1)) * 100);
+      html += `<td style="font-weight:600;">${pct}%</td></tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = stats + html;
+  } catch (err) {
+    console.error('Service Coverage error:', err);
+    container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load coverage data.</p>';
+  }
+}
+
+// ============================================================
+//  ENHANCED ANALYTICS – VENDOR DEPENDENCY
+// ============================================================
+
+async function renderVendorDependency() {
+  const container = document.getElementById('vendor-dependency-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading vendor dependency…</p>';
+
+  try {
+    const res = await API.getVendorDependency();
+    const rows = (res && res.data) || [];
+
+    if (rows.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No vendor data available.</p>';
+      return;
+    }
+
+    const totalProperties = [...new Set(rows.flatMap(r => (r.Properties || '').split(', ').filter(Boolean)))].length || 1;
+    const totalMonthly = rows.reduce((s, r) => s + (parseFloat(r.TotalMonthly) || 0), 0);
+
+    const cards = rows.slice(0, 20).map(row => {
+      const propCount = parseInt(row.PropertyCount) || 0;
+      const monthly = parseFloat(row.TotalMonthly) || 0;
+      const annual = parseFloat(row.TotalAnnual) || 0;
+      const contractCount = parseInt(row.ContractCount) || 0;
+      const concentrationPct = Math.round((propCount / totalProperties) * 100);
+      const spendPct = totalMonthly > 0 ? Math.round((monthly / totalMonthly) * 100) : 0;
+
+      let riskLevel, riskLabel;
+      if (concentrationPct >= 70) { riskLevel = 'risk-high'; riskLabel = 'High Risk'; }
+      else if (concentrationPct >= 40) { riskLevel = 'risk-med'; riskLabel = 'Medium'; }
+      else { riskLevel = 'risk-low'; riskLabel = 'Low'; }
+
+      return `<div class="vendor-dep-card">
+        <div class="vendor-dep-card-header">
+          <span class="vendor-dep-name">${esc(row.VendorName)}</span>
+          <span class="vendor-dep-badge ${riskLevel}">${riskLabel}</span>
+        </div>
+        <div class="vendor-dep-stats">
+          <span class="vendor-dep-stat-label">Properties</span>
+          <span class="vendor-dep-stat-value">${propCount} / ${totalProperties}</span>
+          <span class="vendor-dep-stat-label">Contracts</span>
+          <span class="vendor-dep-stat-value">${contractCount}</span>
+          <span class="vendor-dep-stat-label">Monthly</span>
+          <span class="vendor-dep-stat-value">${formatCurrencyShort(monthly)}</span>
+          <span class="vendor-dep-stat-label">Annual</span>
+          <span class="vendor-dep-stat-value">${formatCurrencyShort(annual)}</span>
+        </div>
+        <div class="vendor-dep-concentration-bar">
+          <div class="vendor-dep-concentration-fill" style="width:${concentrationPct}%;background:${concentrationPct >= 70 ? 'var(--error)' : concentrationPct >= 40 ? 'var(--warning)' : 'var(--success)'}"></div>
+        </div>
+        <div class="vendor-dep-properties">${esc(row.Properties || '—')}</div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML = '<div class="vendor-dep-grid">' + cards + '</div>';
+  } catch (err) {
+    console.error('Vendor Dependency error:', err);
+    container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load vendor dependency data.</p>';
+  }
+}
+
+// ============================================================
+//  ENHANCED ANALYTICS – RENEWAL PIPELINE
+// ============================================================
+
+async function renderRenewalPipeline() {
+  const detailsContainer = document.getElementById('renewal-pipeline-details');
+  if (!detailsContainer) return;
+  detailsContainer.innerHTML = '<p class="text-muted" style="padding:16px;">Loading renewal pipeline…</p>';
+
+  try {
+    const res = await API.getRenewalPipeline();
+    const data = (res && res.data) || {};
+    const pipeline = data.pipeline || [];
+    const noExpiryCount = data.noExpiryCount || 0;
+
+    if (pipeline.length === 0) {
+      detailsContainer.innerHTML = `<p class="text-muted" style="padding:16px;">No upcoming renewals found.${noExpiryCount > 0 ? ' ' + noExpiryCount + ' contracts have no expiry date.' : ''}</p>`;
+      return;
+    }
+
+    const totalAtRisk = pipeline.reduce((s, r) => s + (parseFloat(r.MonthlyAtRisk) || 0), 0);
+    const totalContracts = pipeline.reduce((s, r) => s + (parseInt(r.ContractCount) || 0), 0);
+    const totalNotice = pipeline.reduce((s, r) => s + (parseInt(r.NoticeDeadlineSoon) || 0), 0);
+
+    const summary = `<div class="pipeline-summary">
+      <div class="pipeline-summary-stat">
+        <div class="stat-value">${totalContracts}</div>
+        <div class="stat-label">Expiring</div>
+      </div>
+      <div class="pipeline-summary-stat">
+        <div class="stat-value">${formatCurrencyShort(totalAtRisk * 12)}</div>
+        <div class="stat-label">Annual at Risk</div>
+      </div>
+      <div class="pipeline-summary-stat">
+        <div class="stat-value">${totalNotice}</div>
+        <div class="stat-label">Notice Deadline Soon</div>
+      </div>
+      <div class="pipeline-summary-stat">
+        <div class="stat-value">${noExpiryCount}</div>
+        <div class="stat-label">No Expiry Date</div>
+      </div>
+    </div>`;
+
+    const labels = pipeline.map(r => r.ExpiryMonth);
+    const autoData = pipeline.map(r => parseInt(r.AutoRenewCount) || 0);
+    const manualData = pipeline.map(r => parseInt(r.ManualRenewCount) || 0);
+
+    createChart('chart-renewal-pipeline', {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Auto-Renew',
+            data: autoData,
+            backgroundColor: STOA_COLORS[0] + 'cc',
+            borderColor: STOA_COLORS[0],
+            borderWidth: 1,
+            borderRadius: 4,
+          },
+          {
+            label: 'Manual Renewal',
+            data: manualData,
+            backgroundColor: '#f59e0b' + 'cc',
+            borderColor: '#f59e0b',
+            borderWidth: 1,
+            borderRadius: 4,
+          }
+        ]
+      },
+      options: {
+        ...getChartDefaults(),
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { stepSize: 1, font: { size: 11 } } }
+        },
+        plugins: {
+          ...getChartDefaults().plugins,
+          legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        }
+      }
+    });
+
+    let tableHtml = `<table class="pipeline-details-table">
+      <thead><tr>
+        <th>Month</th><th>Contracts</th><th>Monthly at Risk</th><th>Annual at Risk</th>
+        <th>Auto / Manual</th><th>Notice Soon</th>
+      </tr></thead><tbody>`;
+
+    pipeline.forEach(r => {
+      const auto = parseInt(r.AutoRenewCount) || 0;
+      const manual = parseInt(r.ManualRenewCount) || 0;
+      const total = auto + manual;
+      const autoPct = total > 0 ? Math.round((auto / total) * 100) : 0;
+      const noticeCount = parseInt(r.NoticeDeadlineSoon) || 0;
+
+      tableHtml += `<tr>
+        <td>${esc(r.ExpiryMonth)}</td>
+        <td>${r.ContractCount}</td>
+        <td>${formatCurrency(r.MonthlyAtRisk)}</td>
+        <td>${formatCurrency(r.AnnualAtRisk)}</td>
+        <td>
+          <div class="pipeline-bar" title="${auto} auto, ${manual} manual" style="width:120px;">
+            <div class="pipeline-bar-auto" style="width:${autoPct}%"></div>
+            <div class="pipeline-bar-manual" style="width:${100 - autoPct}%"></div>
+          </div>
+        </td>
+        <td>${noticeCount > 0 ? '<span class="pipeline-notice-flag">⚠ ' + noticeCount + '</span>' : '—'}</td>
+      </tr>`;
+    });
+
+    tableHtml += '</tbody></table>';
+    detailsContainer.innerHTML = summary + tableHtml;
+  } catch (err) {
+    console.error('Renewal Pipeline error:', err);
+    detailsContainer.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load renewal pipeline.</p>';
+  }
+}
+
+// ============================================================
+//  ENHANCED ANALYTICS – COST BENCHMARKS
+// ============================================================
+
+async function renderCostBenchmarks() {
+  const container = document.getElementById('cost-benchmarks-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading cost benchmarks…</p>';
+
+  try {
+    const res = await API.getCostBenchmarks();
+    const rows = (res && res.data) || [];
+
+    if (rows.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No benchmark data available.</p>';
+      return;
+    }
+
+    const byCategory = {};
+    rows.forEach(r => {
+      const cat = r.CategoryName || 'Uncategorized';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(r);
+    });
+
+    let html = '<div class="benchmarks-wrap">';
+
+    Object.keys(byCategory).sort().forEach(cat => {
+      const contracts = byCategory[cat];
+      const cpuValues = contracts
+        .map(c => parseFloat(c.CostPerUnit))
+        .filter(v => Number.isFinite(v) && v > 0);
+
+      const avg = cpuValues.length > 0 ? cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length : 0;
+      const min = cpuValues.length > 0 ? Math.min(...cpuValues) : 0;
+      const max = cpuValues.length > 0 ? Math.max(...cpuValues) : 0;
+      const median = cpuValues.length > 0 ? (() => { const s = [...cpuValues].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; })() : 0;
+      const outlierThreshold = avg * 2;
+
+      html += `<div class="benchmark-category">
+        <div class="benchmark-category-header">
+          <span class="benchmark-category-name">${esc(cat)}</span>
+          <span class="benchmark-category-avg">${contracts.length} contracts · Avg: ${formatCurrency(avg)}/unit</span>
+        </div>
+        <div class="benchmark-category-body">
+          <table class="benchmark-table">
+            <thead><tr>
+              <th>Property</th><th>Vendor</th><th>Monthly</th><th>Units</th><th>Cost/Unit</th><th>vs. Avg</th>
+            </tr></thead><tbody>`;
+
+      contracts
+        .sort((a, b) => ((parseFloat(b.CostPerUnit) || 0) - (parseFloat(a.CostPerUnit) || 0)))
+        .forEach(c => {
+          const cpu = parseFloat(c.CostPerUnit);
+          const hasCPU = Number.isFinite(cpu) && cpu > 0;
+          const isOutlier = hasCPU && cpu > outlierThreshold;
+          const vsAvg = hasCPU && avg > 0 ? Math.round(((cpu - avg) / avg) * 100) : null;
+          const barWidth = hasCPU && max > 0 ? Math.round((cpu / max) * 100) : 0;
+
+          html += `<tr class="${isOutlier ? 'benchmark-outlier' : ''}">
+            <td>${esc(c.ProjectName || '—')}</td>
+            <td>${esc(c.VendorName || '—')}</td>
+            <td>${c.MonthlyCost ? formatCurrency(c.MonthlyCost) : '—'}</td>
+            <td>${c.Units || '—'}</td>
+            <td>
+              <div class="benchmark-bar-container">
+                <div class="benchmark-bar-track">
+                  <div class="benchmark-bar-fill ${isOutlier ? 'outlier' : ''}" style="width:${barWidth}%"></div>
+                </div>
+                <span>${hasCPU ? formatCurrency(cpu) : '—'}</span>
+              </div>
+            </td>
+            <td>${vsAvg !== null ? (vsAvg >= 0 ? '+' : '') + vsAvg + '%' : '—'}</td>
+          </tr>`;
+        });
+
+      html += `</tbody></table>
+        <div class="benchmark-stats-row">
+          <span>Min: <strong>${formatCurrency(min)}</strong></span>
+          <span>Avg: <strong>${formatCurrency(avg)}</strong></span>
+          <span>Median: <strong>${formatCurrency(median)}</strong></span>
+          <span>Max: <strong>${formatCurrency(max)}</strong></span>
+        </div>
+      </div></div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Cost Benchmarks error:', err);
+    container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load benchmark data.</p>';
+  }
+}
+
+// ============================================================
 //  SORTING
 // ============================================================
 
@@ -2082,6 +2799,7 @@ function applyStatusFilter() {
 // ============================================================
 
 function openContractModal(contractId) {
+  if (!canEdit()) { showToast('Login and enable Edit Mode to make changes.', 'warning'); return; }
   editingContractId = contractId || null;
   pendingFiles = [];
 
@@ -2121,6 +2839,20 @@ function openContractModal(contractId) {
       setFormVal('#contractResponsiblePerson', c.ResponsiblePersonId || '');
       setFormVal('#contractAssignmentLanguage', c.AssignmentLanguage || '');
       setFormVal('#contractNotes', c.Notes || '');
+      setFormVal('#contractContractNumber', c.ContractNumber || '');
+      setFormVal('#contractSignedBy', c.SignedBy || '');
+      setFormVal('#contractSignedDate', formatDateISO(c.SignedDate));
+      setFormVal('#contractSetupFee', c.OneTimeSetupFee || '');
+      setFormVal('#contractEscalation', c.AnnualEscalation || '');
+      setFormVal('#contractEarlyTermTerms', c.EarlyTerminationTerms || '');
+      setFormVal('#contractServiceFrequency', c.ServiceFrequency || '');
+      setFormChecked('#contractInsuranceRequired', c.InsuranceRequired === true || c.InsuranceRequired === 1);
+      setFormVal('#contractPaymentMethod', c.PaymentMethod || '');
+      setFormVal('#contractPerUnitCost', c.PerUnitCost || '');
+      setFormVal('#contractScope', c.ContractScope || '');
+      setFormChecked('#contractNonCancellable', c.IsNonCancellable === true || c.IsNonCancellable === 1);
+      setFormVal('#contractRenewalTermType', c.RenewalTermType || '');
+      setFormVal('#contractAccountRep', c.AccountRepresentative || '');
 
       if (attachmentsEl) loadContractAttachments(contractId, attachmentsEl, false);
     }
@@ -2173,6 +2905,7 @@ function setFormChecked(selector, checked) {
 
 async function saveContract(e) {
   if (e) e.preventDefault();
+  if (!canEdit()) { showToast('Login and enable Edit Mode to make changes.', 'warning'); return; }
 
   const propId = ($('#contractProperty') || {}).value;
   const vendorVal = ($('#contractVendor') || {}).value;
@@ -2220,7 +2953,21 @@ async function saveContract(e) {
     TerminationFeeAmount: parseFloat(($('#contractTerminationFeeAmount') || {}).value) || null,
     ResponsiblePersonId: parseInt(($('#contractResponsiblePerson') || {}).value, 10) || null,
     AssignmentLanguage: ($('#contractAssignmentLanguage') || {}).value || null,
-    Notes: ($('#contractNotes') || {}).value || null
+    Notes: ($('#contractNotes') || {}).value || null,
+    ContractNumber: ($('#contractContractNumber') || {}).value || null,
+    SignedBy: ($('#contractSignedBy') || {}).value || null,
+    SignedDate: ($('#contractSignedDate') || {}).value || null,
+    OneTimeSetupFee: parseFloat(($('#contractSetupFee') || {}).value) || null,
+    AnnualEscalation: ($('#contractEscalation') || {}).value || null,
+    EarlyTerminationTerms: ($('#contractEarlyTermTerms') || {}).value || null,
+    ServiceFrequency: ($('#contractServiceFrequency') || {}).value || null,
+    InsuranceRequired: !!($('#contractInsuranceRequired') || {}).checked,
+    PaymentMethod: ($('#contractPaymentMethod') || {}).value || null,
+    PerUnitCost: parseFloat(($('#contractPerUnitCost') || {}).value) || null,
+    ContractScope: ($('#contractScope') || {}).value || null,
+    IsNonCancellable: !!($('#contractNonCancellable') || {}).checked,
+    RenewalTermType: ($('#contractRenewalTermType') || {}).value || null,
+    AccountRepresentative: ($('#contractAccountRep') || {}).value || null
   };
 
   try {
@@ -2272,6 +3019,7 @@ async function saveContract(e) {
 // ============================================================
 
 function openRenewModal(contractId) {
+  if (!canEdit()) { showToast('Login and enable Edit Mode to renew contracts.', 'warning'); return; }
   renewingContractId = contractId;
   const modal = $('#renew-modal');
   if (!modal) return;
@@ -2307,6 +3055,7 @@ function openRenewModal(contractId) {
 
 async function saveRenewal(e) {
   if (e) e.preventDefault();
+  if (!canEdit()) { showToast('Login and enable Edit Mode to make changes.', 'warning'); return; }
 
   const newExpiration = ($('#renewExpirationDate') || {}).value;
   if (!newExpiration) {
@@ -2388,10 +3137,13 @@ function renderDetailFields(c) {
     ['Category', escapeHtml(categoryName(c.CategoryId))],
     ['Status', getStatusBadge(c.Status)],
     ['Contract Type', escapeHtml(c.ContractType || '—')],
+    ['Contract #', escapeHtml(c.ContractNumber || '—')],
     ['Responsible', escapeHtml(personName(c.ResponsiblePersonId))],
     ['Monthly Cost', formatCurrency(c.MonthlyCost)],
     ['Annual Cost', formatCurrency(c.AnnualCost)],
+    ['Per-Unit Cost', c.PerUnitCost ? formatCurrency(c.PerUnitCost) + '/unit' : '—'],
     ['Billing Frequency', escapeHtml(c.BillingFrequency || '—')],
+    ['Service Frequency', escapeHtml(c.ServiceFrequency || '—')],
     ['Term', (c.ContractTermMonths || c.TermMonths) ? (c.ContractTermMonths || c.TermMonths) + ' months' : '—'],
     ['Start Date', formatDate(c.StartDate)],
     [
@@ -2401,16 +3153,26 @@ function renderDetailFields(c) {
     ],
     ['Notice Period', (c.NoticePeriodDays || c.NoticePeriod) ? (c.NoticePeriodDays || c.NoticePeriod) + ' days' : '—'],
     ['Auto-Renew', getAutoRenewBadge(c.AutoRenew)],
+    ['Renewal Type', escapeHtml(c.RenewalTermType || '—')],
+    ['Non-Cancellable', (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? '<span class="badge badge-danger">Non-Cancellable</span>' : 'No'],
     [
       'Termination Fee',
       (c.TerminationFee === true || c.TerminationFee === 1)
         ? (c.TerminationFeeAmount ? formatCurrency(c.TerminationFeeAmount) : 'Yes')
         : 'None'
     ],
+    ['Setup / One-Time Fee', c.OneTimeSetupFee ? formatCurrency(c.OneTimeSetupFee) : '—'],
+    ['Annual Escalation', escapeHtml(c.AnnualEscalation || '—')],
+    ['Payment Method', escapeHtml(c.PaymentMethod || '—')],
+    ['Signed By', escapeHtml(c.SignedBy || '—')],
+    ['Signed Date', formatDate(c.SignedDate)],
+    ['Account Rep', escapeHtml(c.AccountRepresentative || '—')],
   ];
 
   const fullWidthRows = [];
   if (c.Description) fullWidthRows.push(['Description', escapeHtml(c.Description)]);
+  if (c.ContractScope) fullWidthRows.push(['Scope / Coverage', escapeHtml(c.ContractScope)]);
+  if (c.EarlyTerminationTerms) fullWidthRows.push(['Early Termination Terms', escapeHtml(c.EarlyTerminationTerms)]);
   if (c.AssignmentLanguage) fullWidthRows.push(['Assignment Language', escapeHtml(c.AssignmentLanguage)]);
   if (c.Notes) fullWidthRows.push(['Notes', escapeHtml(c.Notes)]);
 
@@ -2544,6 +3306,7 @@ async function loadContractHistory(contractId, container) {
 // ============================================================
 
 function openVendorModal(vendorId) {
+  if (!canEdit()) { showToast('Login and enable Edit Mode to manage vendors.', 'warning'); return; }
   editingVendorId = vendorId || null;
   const modal = $('#vendor-modal');
   if (!modal) return;
@@ -2572,6 +3335,7 @@ function openVendorModal(vendorId) {
 
 async function saveVendor(e) {
   if (e) e.preventDefault();
+  if (!canEdit()) { showToast('Login and enable Edit Mode to make changes.', 'warning'); return; }
 
   const name = ($('#vendorName') || {}).value;
   if (!name || !name.trim()) {
@@ -2655,6 +3419,7 @@ function handleConfirmCancel() {
 // ============================================================
 
 function deleteContract(id) {
+  if (!canEdit()) { showToast('Login and enable Edit Mode to delete.', 'warning'); return; }
   const c = allContracts.find(x => (x.ContractId || x.Id) === id);
   const desc = c ? (c.Description || vendorName(c.VendorId) || 'Contract #' + id) : 'this contract';
   showConfirm(`Delete "${desc}"? This action cannot be undone.`, async () => {
@@ -2674,6 +3439,7 @@ function deleteContract(id) {
 }
 
 function deleteVendor(id) {
+  if (!canEdit()) { showToast('Login and enable Edit Mode to delete.', 'warning'); return; }
   const v = allVendors.find(x => (x.VendorId || x.Id) === id);
   const name = v ? (v.VendorName || v.Name || 'Vendor #' + id) : 'this vendor';
   const contractCount = allContracts.filter(c => String(c.VendorId) === String(id)).length;
@@ -2827,6 +3593,32 @@ function bindEventListeners() {
     });
   });
 
+  const loginBtn = $('#loginBtn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      if (isAuthenticated) {
+        handleLogout();
+      } else {
+        const modal = $('#login-modal');
+        if (modal) modal.classList.add('active');
+        const usernameField = $('#loginUsername');
+        if (usernameField) setTimeout(() => usernameField.focus(), 200);
+      }
+    });
+  }
+
+  const loginForm = $('#loginForm');
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+
+  const closeLoginBtn = $('#closeLoginBtn');
+  if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModalAnimated($('#login-modal')));
+
+  const cancelLoginBtn = $('#cancelLoginBtn');
+  if (cancelLoginBtn) cancelLoginBtn.addEventListener('click', () => closeModalAnimated($('#login-modal')));
+
+  const editModeBtn = $('#editModeBtn');
+  if (editModeBtn) editModeBtn.addEventListener('click', toggleEditMode);
+
   const addBtn = $('#addContractBtn');
   if (addBtn) addBtn.addEventListener('click', () => openContractModal());
 
@@ -2841,6 +3633,30 @@ function bindEventListeners() {
       if (e.key === 'Escape') {
         searchInput.value = '';
         handleGlobalSearch('');
+      }
+    });
+  }
+
+  const mobileSearchBtn = $('#mobileSearchBtn');
+  const mobileSearchBar = $('#mobileSearchBar');
+  const mobileQ = $('#mobileQ');
+  if (mobileSearchBtn && mobileSearchBar && mobileQ) {
+    mobileSearchBtn.addEventListener('click', () => {
+      mobileSearchBar.classList.toggle('active');
+      if (mobileSearchBar.classList.contains('active')) {
+        mobileQ.focus();
+      }
+    });
+    const debouncedMobileSearch = debounce(e => {
+      handleGlobalSearch(e.target.value);
+      if (searchInput) searchInput.value = e.target.value;
+    }, 250);
+    mobileQ.addEventListener('input', debouncedMobileSearch);
+    mobileQ.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        mobileQ.value = '';
+        handleGlobalSearch('');
+        mobileSearchBar.classList.remove('active');
       }
     });
   }
@@ -2980,6 +3796,15 @@ function bindEventListeners() {
   initStatusMulti();
 
   const resizeHandler = debounce(() => {
+    const isMobile = window.innerWidth <= 768;
+    const wasMobile = document.documentElement.getAttribute('data-mobile') === 'true';
+    if (isMobile !== wasMobile) {
+      document.documentElement.setAttribute('data-mobile', isMobile ? 'true' : 'false');
+      window.IS_MOBILE = isMobile;
+      renderedTabs.clear();
+      renderCurrentTab();
+    }
+
     Object.values(chartInstances).forEach(chart => {
       if (chart && typeof chart.resize === 'function') {
         try { chart.resize(); } catch(e) {}
@@ -2987,6 +3812,17 @@ function bindEventListeners() {
     });
   }, 250);
   window.addEventListener('resize', resizeHandler);
+
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      resizeHandler();
+      Object.values(chartInstances).forEach(chart => {
+        if (chart && typeof chart.resize === 'function') {
+          try { chart.resize(); } catch(e) {}
+        }
+      });
+    }, 300);
+  });
 }
 
 // ============================================================

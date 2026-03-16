@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#7e8a6b" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Contracts Dashboard | Stoa Group</title>
-  <script>(function(){var w=window,d=document.documentElement;var m=w.matchMedia&&w.matchMedia('(max-width:768px)').matches||('ontouchstart'in w)||(w.innerWidth<=768);d.setAttribute('data-mobile',m?'true':'false');w.IS_MOBILE=m;})();</script>
+  <script>(function(){var w=window,d=document.documentElement;function u(){var m=w.innerWidth<=768;d.setAttribute('data-mobile',m?'true':'false');w.IS_MOBILE=m;}u();w.addEventListener('resize',u);})();</script>
   <link rel="stylesheet" href="app.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
@@ -24,10 +24,19 @@
 
     <div class="controls">
       <input id="q" class="search" type="search" placeholder="Search contracts, vendors, properties…" aria-label="Search contracts" />
+      <button id="mobileSearchBtn" class="btn btn-icon mobile-only" aria-label="Search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10.5" y1="10.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <span id="adminBadge" class="admin-badge" style="display:none;">ADMIN</span>
+      <button id="editModeBtn" class="btn btn-sm edit-mode-btn" style="display:none;">Edit Mode</button>
+      <button id="loginBtn" class="btn btn-sm">Login</button>
       <button id="refreshBtn" class="btn btn-icon" aria-label="Refresh data">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v4l2-2M8 14v-4l2 2M2 8h4l-2-2M14 8h-4l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
-      <button id="addContractBtn" class="btn btn-primary" aria-label="Add contract">+ Add Contract</button>
+      <button id="addContractBtn" class="btn btn-primary admin-edit-only" style="display:none;" aria-label="Add contract">+ Add Contract</button>
+    </div>
+    <div class="mobile-search-bar" id="mobileSearchBar">
+      <input id="mobileQ" class="search" type="search" placeholder="Search contracts, vendors, properties…" aria-label="Search contracts" />
     </div>
   </header>
 
@@ -99,45 +108,28 @@
           <div class="kpi-label">Expired</div>
           <div class="kpi-value">—</div>
         </div>
+        <div class="kpi-card" id="kpi-non-cancellable">
+          <div class="kpi-label">Non-Cancellable</div>
+          <div class="kpi-value">—</div>
+        </div>
+        <div class="kpi-card" id="kpi-with-escalation">
+          <div class="kpi-label">With Escalation</div>
+          <div class="kpi-value">—</div>
+        </div>
+        <div class="kpi-card" id="kpi-setup-fees">
+          <div class="kpi-label">Total Setup Fees</div>
+          <div class="kpi-value">—</div>
+        </div>
       </section>
 
-      <div class="dashboard-charts">
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">Upcoming Renewals</div>
-          </div>
-          <div class="panel-body">
-            <div id="renewals-list"></div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">Spend by Category</div>
-          </div>
-          <div class="panel-body">
-            <canvas id="chart-spend-category"></canvas>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">Spend by Property</div>
-          </div>
-          <div class="panel-body">
-            <canvas id="chart-spend-property"></canvas>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">Monthly Spend Trend</div>
-          </div>
-          <div class="panel-body">
-            <canvas id="chart-spend-trend"></canvas>
-          </div>
-        </section>
-      </div>
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Upcoming Renewals</div>
+        </div>
+        <div class="panel-body">
+          <div id="renewals-list"></div>
+        </div>
+      </section>
 
       <section class="panel">
         <div class="panel-head">
@@ -216,7 +208,7 @@
           </div>
           <div class="inline-controls">
             <input id="vendorSearch" class="search" type="search" placeholder="Search vendors…" aria-label="Search vendors" />
-            <button id="addVendorBtn" class="btn btn-sm">+ Add Vendor</button>
+            <button id="addVendorBtn" class="btn btn-sm admin-edit-only" style="display:none;">+ Add Vendor</button>
           </div>
         </div>
       </div>
@@ -262,7 +254,7 @@
           <option value="auto">Auto-Renew Only</option>
           <option value="manual">Manual Renewal Only</option>
         </select>
-        <button id="bulkReminderBtn" class="btn btn-sm">Send Bulk Reminder</button>
+        <button id="bulkReminderBtn" class="btn btn-sm admin-edit-only" style="display:none;">Send Bulk Reminder</button>
       </div>
 
       <section class="panel">
@@ -277,11 +269,12 @@
                 <th class="th-sort num" data-key="DaysUntil">Days Until <i class="sort"></i></th>
                 <th class="th-sort" data-key="AutoRenew">Auto-Renew <i class="sort"></i></th>
                 <th class="th-sort num" data-key="NoticePeriod">Notice Period <i class="sort"></i></th>
+                <th class="th-sort" data-key="RenewalTermType">Renewal Type <i class="sort"></i></th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td class="empty" colspan="8">Loading…</td></tr>
+              <tr><td class="empty" colspan="9">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -298,7 +291,13 @@
       </div>
 
       <div class="view-switcher">
-        <button class="view-switch active" data-view="spend-over-time">
+        <button class="view-switch active" data-view="spend-by-category">
+          <span>By Category</span>
+        </button>
+        <button class="view-switch" data-view="spend-by-property">
+          <span>By Property</span>
+        </button>
+        <button class="view-switch" data-view="spend-over-time">
           <span>Spend Over Time</span>
         </button>
         <button class="view-switch" data-view="cost-per-unit">
@@ -310,9 +309,45 @@
         <button class="view-switch" data-view="vendor-analysis">
           <span>Vendor Analysis</span>
         </button>
+        <button class="view-switch" data-view="service-matrix">
+          <span>Service Matrix</span>
+        </button>
+        <button class="view-switch" data-view="completeness">
+          <span>Completeness</span>
+        </button>
+        <button class="view-switch" data-view="service-coverage">
+          <span>Coverage</span>
+        </button>
+        <button class="view-switch" data-view="vendor-dependency">
+          <span>Vendor Dependency</span>
+        </button>
+        <button class="view-switch" data-view="renewal-pipeline">
+          <span>Renewal Pipeline</span>
+        </button>
+        <button class="view-switch" data-view="cost-benchmarks">
+          <span>Cost Benchmarks</span>
+        </button>
       </div>
 
       <div class="analytics-charts">
+        <section class="panel" data-chart="spend-by-category">
+          <div class="panel-head">
+            <div class="panel-title">Spend by Category</div>
+          </div>
+          <div class="panel-body">
+            <canvas id="chart-spend-category"></canvas>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="spend-by-property">
+          <div class="panel-head">
+            <div class="panel-title">Spend by Property</div>
+          </div>
+          <div class="panel-body">
+            <canvas id="chart-spend-property"></canvas>
+          </div>
+        </section>
+
         <section class="panel" data-chart="spend-over-time">
           <div class="panel-head">
             <div class="panel-title">Spend Over Time</div>
@@ -346,6 +381,61 @@
           </div>
           <div class="panel-body">
             <canvas id="chart-vendor-concentration"></canvas>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="service-matrix">
+          <div class="panel-head">
+            <div class="panel-title">Service Comparison Matrix</div>
+          </div>
+          <div class="panel-body">
+            <div id="service-matrix-container" class="service-matrix-wrap"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="completeness">
+          <div class="panel-head">
+            <div class="panel-title">Contract Completeness Scorecard</div>
+          </div>
+          <div class="panel-body">
+            <div id="completeness-container"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="service-coverage">
+          <div class="panel-head">
+            <div class="panel-title">Portfolio Service Coverage</div>
+          </div>
+          <div class="panel-body">
+            <div id="service-coverage-container"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="vendor-dependency">
+          <div class="panel-head">
+            <div class="panel-title">Vendor Dependency Analysis</div>
+          </div>
+          <div class="panel-body">
+            <div id="vendor-dependency-container"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="renewal-pipeline">
+          <div class="panel-head">
+            <div class="panel-title">Renewal Pipeline</div>
+          </div>
+          <div class="panel-body">
+            <canvas id="chart-renewal-pipeline"></canvas>
+            <div id="renewal-pipeline-details"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-chart="cost-benchmarks">
+          <div class="panel-head">
+            <div class="panel-title">Cost Benchmarking</div>
+          </div>
+          <div class="panel-body">
+            <div id="cost-benchmarks-container"></div>
           </div>
         </section>
       </div>
@@ -481,6 +571,88 @@
           <div class="form-group">
             <label for="contractAssignmentLanguage">Assignment Language</label>
             <textarea id="contractAssignmentLanguage" class="form-input" rows="3" placeholder="Assignment/transfer provisions…"></textarea>
+          </div>
+
+          <h4 class="form-section-title" style="margin: 20px 0 12px; font-size: 13px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; border-top: 1px solid var(--line); padding-top: 16px;">Contract Details</h4>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contractContractNumber">Contract #</label>
+              <input type="text" id="contractContractNumber" class="form-input" placeholder="e.g. #4756392" />
+            </div>
+            <div class="form-group">
+              <label for="contractSetupFee">One-Time Setup Fee</label>
+              <input type="number" id="contractSetupFee" class="form-input" step="0.01" placeholder="$0.00" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contractPerUnitCost">Per-Unit Cost</label>
+              <input type="number" id="contractPerUnitCost" class="form-input" step="0.01" placeholder="$/unit" />
+            </div>
+            <div class="form-group">
+              <label for="contractServiceFrequency">Service Frequency</label>
+              <input type="text" id="contractServiceFrequency" class="form-input" placeholder="e.g. Weekly, Quarterly" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contractEscalation">Annual Escalation</label>
+              <input type="text" id="contractEscalation" class="form-input" placeholder="e.g. CPI or 2%, 7% annual" />
+            </div>
+            <div class="form-group">
+              <label for="contractPaymentMethod">Payment Method</label>
+              <input type="text" id="contractPaymentMethod" class="form-input" placeholder="e.g. Net 30, Contingency" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contractRenewalTermType">Renewal Term Type</label>
+              <input type="text" id="contractRenewalTermType" class="form-input" placeholder="e.g. MTM, 12-month auto-renew" />
+            </div>
+            <div class="form-group">
+              <label for="contractAccountRep">Account Representative</label>
+              <input type="text" id="contractAccountRep" class="form-input" placeholder="Vendor contact / AE" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="contractEarlyTermTerms">Early Termination Terms</label>
+            <input type="text" id="contractEarlyTermTerms" class="form-input" placeholder="e.g. 100% remaining MRC, equalization fee" />
+          </div>
+
+          <div class="form-group">
+            <label for="contractScope">Scope / Coverage</label>
+            <input type="text" id="contractScope" class="form-input" placeholder="e.g. 294 units, 2 ponds, 3 cameras" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contractSignedBy">Signed By</label>
+              <input type="text" id="contractSignedBy" class="form-input" placeholder="Name of signer" />
+            </div>
+            <div class="form-group">
+              <label for="contractSignedDate">Signed Date</label>
+              <input type="date" id="contractSignedDate" class="form-input" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="contractNonCancellable" />
+                Non-Cancellable
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="contractInsuranceRequired" />
+                Insurance Required
+              </label>
+            </div>
           </div>
 
           <div class="form-group">
@@ -627,9 +799,37 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="detailCloseBtn">Close</button>
-        <button type="button" class="btn" id="detailRenewBtn">Renew</button>
-        <button type="button" class="btn btn-primary" id="detailEditBtn">Edit</button>
+        <button type="button" class="btn admin-edit-only" id="detailRenewBtn" style="display:none;">Renew</button>
+        <button type="button" class="btn btn-primary admin-edit-only" id="detailEditBtn" style="display:none;">Edit</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Admin Login</h3>
+        <button type="button" class="modal-close" id="closeLoginBtn" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="loginForm">
+        <div class="modal-body">
+          <p class="text-muted mb-16">Login to enable editing of contract operations data.</p>
+          <div class="form-group">
+            <label for="loginUsername" class="form-label">Username / Email <span class="required">*</span></label>
+            <input type="text" id="loginUsername" class="form-input" required placeholder="Enter username or email" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword" class="form-label">Password <span class="required">*</span></label>
+            <input type="password" id="loginPassword" class="form-input" required placeholder="Enter password" autocomplete="current-password" />
+          </div>
+          <div id="loginError" class="form-error" style="display:none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelLoginBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Login</button>
+        </div>
+      </form>
     </div>
   </div>
 
