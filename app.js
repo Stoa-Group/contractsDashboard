@@ -598,25 +598,63 @@ async function initializeAuth() {
 }
 
 async function getDomoCurrentUser() {
-  const params = new URLSearchParams(window.location.search);
-  const email = params.get('userEmail');
-  const name = params.get('userName');
-  const userId = params.get('userId');
-  if (email) return { email, name, userId };
-
-  if (DOMO && DOMO.env) {
-    const domoUserId = DOMO.env.userId;
-    const domoEmail = DOMO.env.email;
-    if (domoEmail) return { email: domoEmail, name: '', userId: domoUserId };
-    if (domoUserId) {
-      try {
-        const resp = await fetch(`/api/content/v1/users/${domoUserId}`);
-        const data = await resp.json();
-        if (data.emailAddress) return { email: data.emailAddress, name: data.displayName || '', userId: domoUserId };
-      } catch (e) {}
+  try {
+    const qs = window.location && window.location.search ? window.location.search : '';
+    if (qs) {
+      const params = new URLSearchParams(qs);
+      const email = params.get('userEmail') || params.get('email') || null;
+      const name = params.get('userName') || params.get('name') || null;
+      const userId = params.get('userId') || null;
+      if (email && email.trim()) {
+        console.log('[Domo SSO] User from URL params:', email.trim());
+        const u = { email: email.trim() };
+        if (name) u.name = name.trim();
+        if (userId) u.userId = userId.trim();
+        return u;
+      }
     }
+  } catch (e) {}
+
+  const domoObj = DOMO || getDomoQuick();
+  if (!domoObj) {
+    console.log('[Domo SSO] No Domo object and no URL params');
+    return null;
   }
-  return null;
+  try {
+    const userId = (domoObj.env && domoObj.env.userId) ? String(domoObj.env.userId) : null;
+    if (!userId) {
+      console.log('[Domo SSO] No domo.env.userId');
+      return null;
+    }
+    const user = { userId };
+    if (domoObj.env) {
+      const envEmail = domoObj.env.email || domoObj.env.userEmail || domoObj.env.UserEmail;
+      if (envEmail && typeof envEmail === 'string' && envEmail.trim()) user.email = envEmail.trim();
+      if (domoObj.env.name && typeof domoObj.env.name === 'string') user.name = domoObj.env.name;
+    }
+    if (!user.email) {
+      try {
+        const profile = await domoObj.get('/api/content/v1/users/' + userId);
+        if (profile && typeof profile === 'object') {
+          if (profile.email) user.email = profile.email;
+          else if (profile.emailAddress) user.email = profile.emailAddress;
+          if (profile.name) user.name = profile.name;
+          else if (profile.displayName) user.name = profile.displayName;
+        }
+      } catch (profileErr) {
+        console.warn('[Domo SSO] User profile fetch failed:', profileErr && profileErr.message ? profileErr.message : profileErr);
+      }
+    }
+    if (!user.email || !user.email.trim()) {
+      console.log('[Domo SSO] No email from Domo – SSO skipped.');
+      return null;
+    }
+    console.log('[Domo SSO] Resolved email:', user.email);
+    return user;
+  } catch (e) {
+    console.warn('[Domo SSO] getDomoCurrentUser failed:', e);
+    return null;
+  }
 }
 
 async function handleLogin(e) {
