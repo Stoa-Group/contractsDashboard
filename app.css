@@ -58,6 +58,13 @@
   --font-medium: 'Gotham Medium', 'Gotham', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   --font-base: var(--font-body);
   --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+  --segment-active: #10b981;
+  --segment-pending: #f59e0b;
+  --segment-expired: #ef4444;
+  --segment-cancelled: #9ca3af;
+  --segment-renewed: #06b6d4;
+  --segment-archived: #6366f1;
 }
 
 /* =========================================================
@@ -711,6 +718,31 @@ html.domo-dashboard-embed .page {
   font-family: var(--font-medium);
 }
 
+.kpi-primary {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 12px;
+}
+.kpi-primary .kpi-card {
+  padding: 20px 16px;
+}
+.kpi-primary .kpi-value {
+  font-size: clamp(22px, 2.5vw, 32px);
+}
+
+.kpi-alerts {
+  grid-template-columns: repeat(6, 1fr);
+  margin-bottom: 16px;
+}
+.kpi-alerts .kpi-card {
+  padding: 12px 10px;
+}
+.kpi-alerts .kpi-label {
+  font-size: 10px;
+}
+.kpi-alerts .kpi-value {
+  font-size: clamp(16px, 1.8vw, 22px);
+}
+
 .kpi-card.kpi-alert {
   border-left: 3px solid var(--warning);
 }
@@ -748,26 +780,21 @@ html.domo-dashboard-embed .page {
    ========================================================= */
 
 .panel {
-  background: var(--white);
-  border: 1px solid rgba(126, 138, 107, 0.15);
-  border-radius: 0 0 8px 8px;
-  padding: 0;
-  box-shadow: 0 2px 4px rgba(126, 138, 107, 0.1);
-  overflow: visible;
-  position: relative;
-  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
 }
 
 .panel-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 14px 20px;
-  background: var(--white);
-  border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
-  margin-bottom: 0;
 }
 
 .panel-title-wrap {
@@ -776,10 +803,10 @@ html.domo-dashboard-embed .page {
 }
 
 .panel-title {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--text-primary);
   font-family: var(--font-medium);
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 600;
   margin-bottom: 0;
 }
 
@@ -796,7 +823,7 @@ html.domo-dashboard-embed .page {
 }
 
 .panel-body {
-  padding: 20px;
+  padding: 16px;
 }
 
 .panel-body:empty {
@@ -1024,17 +1051,20 @@ html.domo-dashboard-embed .page {
 }
 
 /* Sortable columns */
-.table th[data-sort] {
+.table th[data-sort],
+.table th.th-sort {
   cursor: pointer;
   user-select: none;
 }
 
-.table th[data-sort]:hover {
+.table th[data-sort]:hover,
+.table th.th-sort:hover {
   background: var(--stoa-green-pale);
   color: var(--stoa-green-dark);
 }
 
-.table th[data-sort]::after {
+.table th[data-sort]::after,
+.table th.th-sort::after {
   content: '↕';
   position: absolute;
   right: 8px;
@@ -1045,17 +1075,20 @@ html.domo-dashboard-embed .page {
   transition: opacity var(--transition-fast);
 }
 
-.table th[data-sort]:hover::after {
+.table th[data-sort]:hover::after,
+.table th.th-sort:hover::after {
   opacity: 0.8;
 }
 
-.table th[data-sort].sort-asc::after {
+.table th[data-sort].sort-asc::after,
+.table th.th-sort.sort-asc::after {
   content: '↑';
   opacity: 1;
   color: var(--stoa-green-dark);
 }
 
-.table th[data-sort].sort-desc::after {
+.table th[data-sort].sort-desc::after,
+.table th.th-sort.sort-desc::after {
   content: '↓';
   opacity: 1;
   color: var(--stoa-green-dark);
@@ -2031,18 +2064,13 @@ html.domo-dashboard-embed .page {
 .chart-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 280px;
-  max-height: 480px;
-  padding: 16px;
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
+  max-height: 400px;
+  margin: 0 auto;
+  min-height: 200px;
 }
 
 .chart-container canvas {
-  width: 100% !important;
-  height: 100% !important;
+  max-height: 400px !important;
 }
 
 .chart-grid {
@@ -2128,7 +2156,8 @@ html.domo-dashboard-embed .page {
   background: var(--stoa-green-pale);
 }
 
-.upload-zone.drag-over {
+.upload-zone.drag-over,
+.upload-zone.dragover {
   border-color: var(--stoa-green);
   background: var(--stoa-green-pale);
   animation: uploadPulse 1s ease infinite;
@@ -2180,7 +2209,8 @@ html.domo-dashboard-embed .page {
    Attachment List
    ========================================================= */
 
-.attachment-list {
+.attachment-list,
+.attachments-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2262,8 +2292,122 @@ html.domo-dashboard-embed .page {
 }
 
 /* =========================================================
+   Urgency Summary (Expiry Tracker)
+   ========================================================= */
+
+.urgency-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.urgency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.urgency-chip.urgency-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.urgency-chip.urgency-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+.urgency-chip.urgency-upcoming {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+.urgency-chip.urgency-total {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.urgency-count {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Action hints */
+.action-hint {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.action-hint.action-auto {
+  background: #d1fae5;
+  color: #065f46;
+}
+.action-hint.action-needed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* =========================================================
    Timeline (Expiry Tracker)
    ========================================================= */
+
+.timeline-group {
+  margin-bottom: 24px;
+}
+
+.timeline-month {
+  font-weight: bold;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.timeline-items {
+  padding-left: 20px;
+  border-left: 2px solid var(--line);
+}
+
+.timeline-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 13px;
+}
+
+.timeline-days {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.timeline-days.urgency-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.timeline-days.urgency-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.timeline-days.urgency-upcoming,
+.timeline-days.urgency-ok {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
 
 .timeline {
   position: relative;
@@ -2341,6 +2485,69 @@ html.domo-dashboard-embed .page {
 .timeline-badge {
   display: inline-block;
   margin-top: 6px;
+}
+
+/* =========================================================
+   Activity List (Recent Activity)
+   ========================================================= */
+
+.activity-list {
+  padding: 0;
+}
+
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.activity-item:hover {
+  background: var(--hover-bg);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.dot-create {
+  background: var(--success);
+}
+
+.dot-update {
+  background: var(--stoa-green);
+}
+
+.activity-desc {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* =========================================================
@@ -2525,8 +2732,13 @@ html.domo-dashboard-embed .page {
 
 .empty-state {
   text-align: center;
-  padding: 56px 24px;
+  padding: 40px 20px;
   color: var(--muted);
+}
+
+.empty-state p {
+  font-size: 14px;
+  margin: 0;
 }
 
 .empty-state-icon {
@@ -2562,6 +2774,14 @@ html.domo-dashboard-embed .page {
   font-size: 15px;
   line-height: 1.5;
   font-weight: 500;
+}
+
+td.empty {
+  text-align: center;
+  padding: 32px 16px !important;
+  color: var(--muted);
+  font-size: 14px;
+  font-style: italic;
 }
 
 /* =========================================================
@@ -2629,28 +2849,27 @@ html.domo-dashboard-embed .page {
 
 .renewals-header {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.5fr 1fr 0.8fr 0.5fr 0.6fr;
+  grid-template-columns: 1.5fr 1.5fr 2fr 1fr 1fr 0.5fr 0.8fr;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 8px 12px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border-bottom: 2px solid var(--line);
 }
 
 .renewals-row {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.5fr 1fr 0.8fr 0.5fr 0.6fr;
+  grid-template-columns: 1.5fr 1.5fr 2fr 1fr 1fr 0.5fr 0.8fr;
   gap: 8px;
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
   transition: background var(--transition-fast);
   align-items: center;
+  font-size: 13px;
 }
 
 .renewals-row:hover {
@@ -2669,27 +2888,46 @@ html.domo-dashboard-embed .page {
 }
 
 .days-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
   font-weight: 700;
-  white-space: nowrap;
+  min-width: 40px;
 }
 
-.days-badge.urgency-critical,
+.days-badge.urgency-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.days-badge.urgency-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.days-badge.urgency-upcoming {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.days-badge.urgency-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
 .renewals-row.urgency-critical .days-badge {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.days-badge.urgency-warning,
 .renewals-row.urgency-warning .days-badge {
   background: #fef3c7;
   color: #92400e;
 }
 
-.days-badge.urgency-ok,
 .renewals-row.urgency-ok .days-badge {
   background: #d1fae5;
   color: #065f46;
@@ -2710,15 +2948,14 @@ html.domo-dashboard-embed .page {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px;
-  transition: all var(--transition-base);
+  padding: 16px;
+  transition: all var(--transition-fast);
   cursor: pointer;
 }
 
 .category-card:hover {
-  box-shadow: var(--shadow-md);
   border-color: var(--stoa-green-light);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .category-card-header {
@@ -2863,6 +3100,67 @@ html.domo-dashboard-embed .page {
 }
 
 /* =========================================================
+   Status Breakdown Bar
+   ========================================================= */
+
+.status-bar {
+  display: flex;
+  height: 32px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.status-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  transition: flex 0.3s ease;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.status-segment.seg-active { background: #10b981; }
+.status-segment.seg-pending { background: #f59e0b; }
+.status-segment.seg-expired { background: #ef4444; }
+.status-segment.seg-cancelled { background: #9ca3af; }
+.status-segment.seg-archived { background: #6366f1; }
+.status-segment.seg-renewed { background: #06b6d4; }
+
+.status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Dashboard Panels Grid
+   ========================================================= */
+
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* =========================================================
    Detail Modal Grid
    ========================================================= */
 
@@ -2907,6 +3205,23 @@ html.domo-dashboard-embed .page {
 
 .detail-field-full {
   grid-column: 1 / -1;
+}
+
+/* =========================================================
+   Summary rows
+   ========================================================= */
+
+.summary-row {
+  background: var(--stoa-green-pale) !important;
+  border-top: 2px solid var(--stoa-green);
+  font-size: 13px;
+}
+.summary-row td {
+  padding: 10px 12px !important;
+  border-bottom: 2px solid var(--stoa-green) !important;
+}
+.summary-row:hover {
+  background: var(--stoa-green-pale) !important;
 }
 
 /* =========================================================
@@ -3106,6 +3421,18 @@ html.domo-dashboard-embed .page {
     margin-bottom: 16px;
   }
 
+  .kpi-primary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpi-alerts {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard-panels {
+    grid-template-columns: 1fr;
+  }
+
   .kpi-card,
   .kpi {
     padding: 14px 14px;
@@ -3294,6 +3621,18 @@ html.domo-dashboard-embed .page {
     padding-left: 20px;
   }
 
+  .urgency-summary {
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .urgency-chip {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .urgency-count {
+    font-size: 15px;
+  }
+
   .view-switcher {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -3354,7 +3693,7 @@ html.domo-dashboard-embed .page {
     gap: 0 12px;
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     padding: 8px 10px;
     background: var(--surface);
     box-shadow: var(--shadow);
@@ -3495,6 +3834,10 @@ html.domo-dashboard-embed .page {
   .kpi-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+
+  .kpi-alerts {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .kpi-card,
@@ -3848,7 +4191,7 @@ html.domo-dashboard-embed .page {
     gap: 0 12px;
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     padding: 8px 10px;
     background: var(--surface);
     width: 100%;
@@ -3912,6 +4255,10 @@ html.domo-dashboard-embed .page {
 
   .sub-table td[data-label=""]::before {
     display: none !important;
+  }
+
+  .sub-table td.num {
+    text-align: right !important;
   }
 }
 

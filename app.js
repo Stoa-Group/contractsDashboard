@@ -793,18 +793,22 @@ function renderKPIs() {
 
   const nonCancellable = active.filter(c => c.IsNonCancellable === true || c.IsNonCancellable === 1).length;
   const withEscalation = active.filter(c => c.AnnualEscalation).length;
-  const totalSetupFees = active.reduce((s, c) => s + (parseFloat(c.OneTimeSetupFee) || 0), 0);
+
+  const activeVendorIds = new Set(
+    allContracts.filter(c => (c.Status || '').toLowerCase() === 'active')
+      .map(c => c.VendorId).filter(Boolean)
+  );
 
   setKPI('#kpi-total', totalActive.toLocaleString());
   setKPI('#kpi-monthly-spend', formatCurrencyWhole(monthlySpend));
   setKPI('#kpi-annual-spend', formatCurrencyWhole(annualSpend));
+  setKPI('#kpi-vendors', activeVendorIds.size);
   setKPI('#kpi-expiring-30', expiring30, expiring30 > 0 ? 'kpi-alert' : '');
   setKPI('#kpi-expiring-60', expiring60, expiring60 > 0 ? 'kpi-attention' : '');
   setKPI('#kpi-expired', expired, expired > 0 ? 'kpi-danger' : '');
   setKPI('#kpi-archived', archived);
   setKPI('#kpi-non-cancellable', nonCancellable, nonCancellable > 0 ? 'kpi-attention' : '');
   setKPI('#kpi-with-escalation', withEscalation);
-  setKPI('#kpi-setup-fees', formatCurrencyWhole(totalSetupFees));
 }
 
 function setKPI(selector, value, extraClass) {
@@ -820,8 +824,48 @@ function setKPI(selector, value, extraClass) {
 //  DASHBOARD TAB
 // ============================================================
 
+function renderStatusBreakdown() {
+  const el = $('#status-breakdown');
+  if (!el) return;
+
+  const counts = {};
+  allContracts.forEach(c => {
+    const s = (c.Status || 'Unknown').toLowerCase();
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  const total = allContracts.length || 1;
+  const segments = [
+    { key: 'active', label: 'Active', cls: 'seg-active' },
+    { key: 'pending', label: 'Pending', cls: 'seg-pending' },
+    { key: 'expired', label: 'Expired', cls: 'seg-expired' },
+    { key: 'cancelled', label: 'Cancelled', cls: 'seg-cancelled' },
+    { key: 'renewed', label: 'Renewed', cls: 'seg-renewed' },
+    { key: 'archived', label: 'Archived', cls: 'seg-archived' },
+  ].filter(s => counts[s.key] > 0);
+
+  el.innerHTML = `
+    <div class="status-bar">
+      ${segments.map(s => {
+        const pct = ((counts[s.key] / total) * 100).toFixed(1);
+        return `<div class="status-segment ${s.cls}" style="flex: ${counts[s.key]}" title="${s.label}: ${counts[s.key]} (${pct}%)">${pct > 5 ? counts[s.key] : ''}</div>`;
+      }).join('')}
+    </div>
+    <div class="status-legend">
+      ${segments.map(s => {
+        const pct = ((counts[s.key] / total) * 100).toFixed(1);
+        return `<div class="status-legend-item">
+          <div class="status-legend-dot" style="background: var(--segment-${s.key}, #ccc)"></div>
+          <span>${s.label}: <strong>${counts[s.key]}</strong> (${pct}%)</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
 function renderDashboard(searchQuery) {
   renderKPIs();
+  renderStatusBreakdown();
   renderRenewalsList(searchQuery);
   renderRecentActivity(searchQuery);
 }
@@ -948,6 +992,26 @@ const STOA_COLORS_EXTENDED = [
   '#5a6b4e', '#8b9178', '#636160', '#a4aab8',
   '#4d4d4d', '#556844', '#7d8590', '#d0d4c9'
 ];
+
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.font.family = "'Gotham Book', 'Gotham', -apple-system, BlinkMacSystemFont, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = '#6b7280';
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.pointStyle = 'rectRounded';
+  Chart.defaults.plugins.legend.labels.padding = 16;
+  Chart.defaults.plugins.tooltip.backgroundColor = '#1f2937';
+  Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: 600 };
+  Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 6;
+  Chart.defaults.plugins.tooltip.displayColors = true;
+  Chart.defaults.elements.bar.borderRadius = 4;
+  Chart.defaults.elements.line.tension = 0.3;
+  Chart.defaults.elements.point.radius = 3;
+  Chart.defaults.elements.point.hoverRadius = 6;
+  Chart.defaults.scale.grid = { color: '#f3f4f6', drawBorder: false };
+}
 
 function getChartDefaults() {
   return {
@@ -1305,7 +1369,21 @@ function renderPropertyView(globalSearch) {
     return;
   }
 
-  tbody.innerHTML = propertyRows.map(r => {
+  const totalContracts = propertyRows.reduce((s, r) => s + r.ContractCount, 0);
+  const totalMonthly = propertyRows.reduce((s, r) => s + r.MonthlySpend, 0);
+  const totalAnnual = propertyRows.reduce((s, r) => s + r.AnnualSpend, 0);
+  const totalExpiring = propertyRows.reduce((s, r) => s + r.Expiring, 0);
+
+  const summaryRow = `<tr class="summary-row">
+  <td><strong>Portfolio Total (${propertyRows.length} properties)</strong></td>
+  <td class="num"><strong>${totalContracts}</strong></td>
+  <td class="num"><strong>${formatCurrency(totalMonthly)}</strong></td>
+  <td class="num"><strong>${formatCurrency(totalAnnual)}</strong></td>
+  <td class="num"><strong>${totalExpiring > 0 ? totalExpiring : '—'}</strong></td>
+  <td></td>
+</tr>`;
+
+  tbody.innerHTML = summaryRow + propertyRows.map(r => {
     const statusBadge = r.Expiring > 0
       ? `<span class="badge ${r.Status === 'critical' ? 'badge-danger' : 'badge-warning'}">Needs Attention</span>`
       : '<span class="badge badge-success">OK</span>';
@@ -1602,10 +1680,25 @@ function renderVendorView(globalSearch) {
     return;
   }
 
-  tbody.innerHTML = vendorRows.map(r => `
+  const totalVendorContracts = vendorRows.reduce((s, r) => s + r.ContractCount, 0);
+  const totalVendorSpend = vendorRows.reduce((s, r) => s + r.TotalSpend, 0);
+  const vendorSummaryRow = `<tr class="summary-row">
+  <td><strong>Total: ${vendorRows.length} vendors</strong></td>
+  <td></td><td></td><td></td>
+  <td class="num"><strong>${totalVendorContracts}</strong></td>
+  <td class="num"><strong>${formatCurrency(totalVendorSpend)}</strong></td>
+  <td></td>
+</tr>`;
+
+  const totalPortfolioSpend = vendorRows.reduce((s, vr) => s + vr.TotalSpend, 0);
+
+  tbody.innerHTML = vendorSummaryRow + vendorRows.map(r => {
+    const pct = totalPortfolioSpend > 0 ? (r.TotalSpend / totalPortfolioSpend * 100) : 0;
+    const concentrationBadge = pct > 20 ? `<span class="badge badge-warning badge-sm" title="${pct.toFixed(1)}% of total spend">High Concentration</span>` : '';
+    return `
     <tr class="vendor-row expandable" data-vendor-id="${r.VendorId}">
       <td data-label="Vendor">
-        <strong>${escapeHtml(r.VendorName)}</strong>
+        <strong>${escapeHtml(r.VendorName)}</strong>${concentrationBadge}
         ${r.Website ? `<br><a href="${escapeHtml(r.Website)}" target="_blank" rel="noopener" class="subtle-link">${escapeHtml(r.Website.replace(/^https?:\/\//, ''))}</a>` : ''}
         ${r.Address ? `<br><small class="subtle">${escapeHtml(r.Address)}</small>` : ''}
       </td>
@@ -1626,7 +1719,8 @@ function renderVendorView(globalSearch) {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   tbody.querySelectorAll('.vendor-row').forEach(row => {
     row.addEventListener('click', e => {
@@ -1708,6 +1802,22 @@ function renderExpiryTable(globalSearch) {
   expiring = sortData(expiring, sortKey, sortDir);
   updateSortIndicators('expiry-table', sortKey, sortDir);
 
+  const overdue = expiring.filter(c => daysUntil(c.ExpirationDate) < 0).length;
+  const critical = expiring.filter(c => { const d = daysUntil(c.ExpirationDate); return d >= 0 && d <= 30; }).length;
+  const warning = expiring.filter(c => { const d = daysUntil(c.ExpirationDate); return d > 30 && d <= 60; }).length;
+  const upcoming = expiring.filter(c => { const d = daysUntil(c.ExpirationDate); return d > 60 && d <= 90; }).length;
+
+  const summaryEl = $('#expiry-urgency-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      ${overdue > 0 ? `<div class="urgency-chip urgency-critical"><span class="urgency-count">${overdue}</span> Overdue</div>` : ''}
+      ${critical > 0 ? `<div class="urgency-chip urgency-critical"><span class="urgency-count">${critical}</span> Critical (≤30d)</div>` : ''}
+      ${warning > 0 ? `<div class="urgency-chip urgency-warning"><span class="urgency-count">${warning}</span> Warning (31-60d)</div>` : ''}
+      ${upcoming > 0 ? `<div class="urgency-chip urgency-upcoming"><span class="urgency-count">${upcoming}</span> Upcoming (61-90d)</div>` : ''}
+      <div class="urgency-chip urgency-total"><span class="urgency-count">${expiring.length}</span> Total</div>
+    `;
+  }
+
   if (expiring.length === 0) {
     tbody.innerHTML = `<tr><td class="empty" colspan="9">No contracts expiring in the next ${timeframe} days.</td></tr>`;
     return;
@@ -1736,7 +1846,7 @@ function renderExpiryTable(globalSearch) {
       <td data-label="Renewal Type">${escapeHtml(renewType)}</td>
       <td class="actions-cell" data-label="">
         <button class="btn btn-xs" onclick="openDetailModal(${c.ContractId || c.Id})">View</button>
-        ${canEdit() ? `<button class="btn btn-xs" onclick="openRenewModal(${c.ContractId || c.Id})">Renew</button>` : ''}
+        ${isAutoRenew(c) ? '<span class="action-hint action-auto">Auto-renews</span>' : (days <= 30 ? '<span class="action-hint action-needed">Action Needed</span>' : (canEdit() ? `<button class="btn btn-xs" onclick="openRenewModal(${c.ContractId || c.Id})">Renew</button>` : ''))}
       </td>
     </tr>`;
   }).join('');
@@ -1773,10 +1883,16 @@ function renderExpiryTimeline(globalSearch) {
     monthGroups[key].push(c);
   });
 
+  const sortedMonths = Object.entries(monthGroups).sort((a, b) => {
+    const dateA = new Date(a[1][0].ExpirationDate);
+    const dateB = new Date(b[1][0].ExpirationDate);
+    return dateA - dateB;
+  });
+
   el.innerHTML = `
     <h3 class="timeline-title">Expiration Timeline</h3>
     <div class="timeline">
-      ${Object.entries(monthGroups).map(([month, contracts]) => {
+      ${sortedMonths.map(([month, contracts]) => {
         const monthUrgency = (() => {
           const minDays = Math.min(...contracts.map(c => daysUntil(c.ExpirationDate)));
           return getUrgencyClass(minDays);
@@ -1795,7 +1911,7 @@ function renderExpiryTimeline(globalSearch) {
                   <strong>${escapeHtml(desc)}</strong>
                   <span>${escapeHtml(projectName(c.ProjectId))}</span>
                 </div>
-                <div class="timeline-days">
+                <div class="timeline-days ${urg}">
                   <span class="days-badge ${urg}">${days}d</span>
                   ${isAutoRenew(c) ? '<span class="auto-renew-indicator" title="Auto-renew">&#8635;</span>' : ''}
                 </div>
@@ -2742,7 +2858,7 @@ function initStatusMulti() {
   const multi = $('#statusMulti');
   if (!multi) return;
 
-  const statuses = ['Active', 'Pending', 'Expired', 'Terminated', 'Under Review'];
+  const statuses = ['Active', 'Pending', 'Expired', 'Cancelled', 'Renewed', 'Archived'];
   const listEl = multi.querySelector('.multi-list');
   if (!listEl) return;
 

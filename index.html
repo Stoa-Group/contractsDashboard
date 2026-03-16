@@ -83,9 +83,9 @@
         <h2 class="view-intro-title">Dashboard Overview</h2>
       </div>
 
-      <section class="kpi-grid" aria-label="key metrics">
+      <section class="kpi-grid kpi-primary" aria-label="key metrics">
         <div class="kpi-card" id="kpi-total">
-          <div class="kpi-label">Total Contracts</div>
+          <div class="kpi-label">Total Active Contracts</div>
           <div class="kpi-value">—</div>
         </div>
         <div class="kpi-card" id="kpi-monthly-spend">
@@ -96,12 +96,19 @@
           <div class="kpi-label">Annual Spend</div>
           <div class="kpi-value">—</div>
         </div>
+        <div class="kpi-card" id="kpi-vendors">
+          <div class="kpi-label">Active Vendors</div>
+          <div class="kpi-value">—</div>
+        </div>
+      </section>
+
+      <section class="kpi-grid kpi-alerts" aria-label="alerts">
         <div class="kpi-card" id="kpi-expiring-30">
-          <div class="kpi-label">Expiring in 30 Days</div>
+          <div class="kpi-label">Expiring 30d</div>
           <div class="kpi-value">—</div>
         </div>
         <div class="kpi-card" id="kpi-expiring-60">
-          <div class="kpi-label">Expiring in 60 Days</div>
+          <div class="kpi-label">Expiring 60d</div>
           <div class="kpi-value">—</div>
         </div>
         <div class="kpi-card" id="kpi-expired">
@@ -120,29 +127,36 @@
           <div class="kpi-label">With Escalation</div>
           <div class="kpi-value">—</div>
         </div>
-        <div class="kpi-card" id="kpi-setup-fees">
-          <div class="kpi-label">Total Setup Fees</div>
-          <div class="kpi-value">—</div>
+      </section>
+
+      <section class="panel" id="status-breakdown-panel">
+        <div class="panel-head">
+          <div class="panel-title">Contract Status Breakdown</div>
+        </div>
+        <div class="panel-body">
+          <div id="status-breakdown"></div>
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Upcoming Renewals</div>
-        </div>
-        <div class="panel-body">
-          <div id="renewals-list"></div>
-        </div>
-      </section>
+      <div class="dashboard-panels">
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Upcoming Renewals</div>
+          </div>
+          <div class="panel-body">
+            <div id="renewals-list"></div>
+          </div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Recent Activity</div>
-        </div>
-        <div class="panel-body">
-          <div id="recent-activity"></div>
-        </div>
-      </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Recent Activity</div>
+          </div>
+          <div class="panel-body">
+            <div id="recent-activity"></div>
+          </div>
+        </section>
+      </div>
     </section>
 
     <!-- By Property -->
@@ -262,6 +276,7 @@
       </div>
 
       <section class="panel">
+        <div id="expiry-urgency-summary" class="urgency-summary"></div>
         <div class="table-wrap">
           <table class="table" id="expiry-table" aria-label="expiring contracts">
             <thead>
@@ -294,41 +309,41 @@
         <p class="view-intro-desc">Visualize spend trends, cost-per-unit breakdowns, and vendor concentration across your portfolio.</p>
       </div>
 
-      <div class="view-switcher">
-        <button class="view-switch active" data-view="spend-by-category">
+      <div class="view-switcher analytics-nav" role="navigation" aria-label="Analytics sub-views">
+        <button class="view-switch analytics-nav-btn active" data-view="spend-by-category">
           <span>By Category</span>
         </button>
-        <button class="view-switch" data-view="spend-by-property">
+        <button class="view-switch analytics-nav-btn" data-view="spend-by-property">
           <span>By Property</span>
         </button>
-        <button class="view-switch" data-view="spend-over-time">
+        <button class="view-switch analytics-nav-btn" data-view="spend-over-time">
           <span>Spend Over Time</span>
         </button>
-        <button class="view-switch" data-view="cost-per-unit">
+        <button class="view-switch analytics-nav-btn" data-view="cost-per-unit">
           <span>Cost Per Unit</span>
         </button>
-        <button class="view-switch" data-view="category-trends">
+        <button class="view-switch analytics-nav-btn" data-view="category-trends">
           <span>Category Trends</span>
         </button>
-        <button class="view-switch" data-view="vendor-analysis">
+        <button class="view-switch analytics-nav-btn" data-view="vendor-analysis">
           <span>Vendor Analysis</span>
         </button>
-        <button class="view-switch" data-view="service-matrix">
+        <button class="view-switch analytics-nav-btn" data-view="service-matrix">
           <span>Service Matrix</span>
         </button>
-        <button class="view-switch" data-view="completeness">
+        <button class="view-switch analytics-nav-btn" data-view="completeness">
           <span>Completeness</span>
         </button>
-        <button class="view-switch" data-view="service-coverage">
+        <button class="view-switch analytics-nav-btn" data-view="service-coverage">
           <span>Coverage</span>
         </button>
-        <button class="view-switch" data-view="vendor-dependency">
+        <button class="view-switch analytics-nav-btn" data-view="vendor-dependency">
           <span>Vendor Dependency</span>
         </button>
-        <button class="view-switch" data-view="renewal-pipeline">
+        <button class="view-switch analytics-nav-btn" data-view="renewal-pipeline">
           <span>Renewal Pipeline</span>
         </button>
-        <button class="view-switch" data-view="cost-benchmarks">
+        <button class="view-switch analytics-nav-btn" data-view="cost-benchmarks">
           <span>Cost Benchmarks</span>
         </button>
       </div>
@@ -336,55 +351,85 @@
       <div class="analytics-charts">
         <section class="panel" data-chart="spend-by-category">
           <div class="panel-head">
-            <div class="panel-title">Spend by Category</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Spend by Category</div>
+              <p class="panel-desc">Monthly spend breakdown by service category.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-spend-category"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-spend-category"></canvas>
+            </div>
           </div>
         </section>
 
         <section class="panel" data-chart="spend-by-property">
           <div class="panel-head">
-            <div class="panel-title">Spend by Property</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Spend by Property</div>
+              <p class="panel-desc">Monthly spend by property across the portfolio.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-spend-property"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-spend-property"></canvas>
+            </div>
           </div>
         </section>
 
         <section class="panel" data-chart="spend-over-time">
           <div class="panel-head">
-            <div class="panel-title">Spend Over Time</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Spend Over Time</div>
+              <p class="panel-desc">Trend of monthly contract spend over time.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-spend-over-time"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-spend-over-time"></canvas>
+            </div>
           </div>
         </section>
 
         <section class="panel" data-chart="cost-per-unit">
           <div class="panel-head">
-            <div class="panel-title">Cost Per Unit</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Cost Per Unit</div>
+              <p class="panel-desc">Cost per unit by property for comparable metrics.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-cost-per-unit"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-cost-per-unit"></canvas>
+            </div>
           </div>
         </section>
 
         <section class="panel" data-chart="category-trends">
           <div class="panel-head">
-            <div class="panel-title">Category Trends</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Category Trends</div>
+              <p class="panel-desc">Spend trends by category over time.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-category-trends"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-category-trends"></canvas>
+            </div>
           </div>
         </section>
 
         <section class="panel" data-chart="vendor-analysis">
           <div class="panel-head">
-            <div class="panel-title">Vendor Concentration</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Vendor Concentration</div>
+              <p class="panel-desc">Share of spend by vendor — identify concentration risk.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-vendor-concentration"></canvas>
+            <div class="chart-container">
+              <canvas id="chart-vendor-concentration"></canvas>
+            </div>
           </div>
         </section>
 
@@ -426,11 +471,16 @@
 
         <section class="panel" data-chart="renewal-pipeline">
           <div class="panel-head">
-            <div class="panel-title">Renewal Pipeline</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Renewal Pipeline</div>
+              <p class="panel-desc">Upcoming renewals by timeframe and auto-renew status.</p>
+            </div>
           </div>
           <div class="panel-body">
-            <canvas id="chart-renewal-pipeline"></canvas>
-            <div id="renewal-pipeline-details"></div>
+            <div class="chart-container">
+              <canvas id="chart-renewal-pipeline"></canvas>
+            </div>
+            <div id="renewal-pipeline-details" class="mt-16"></div>
           </div>
         </section>
 
