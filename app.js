@@ -1061,6 +1061,9 @@ function createChart(canvasId, config, key) {
   const ctx = canvas.getContext('2d');
   try {
     chartInstances[key] = new Chart(ctx, config);
+    requestAnimationFrame(() => {
+      if (chartInstances[key]) chartInstances[key].resize();
+    });
   } catch (err) {
     console.error(`[Chart] Failed to create "${key}":`, err);
     return null;
@@ -1971,20 +1974,22 @@ function showAnalyticsSubView(view) {
     panel.style.display = chartType === view ? 'block' : 'none';
   });
 
-  switch (view) {
-    case 'spend-by-category': renderSpendByCategoryChart(); break;
-    case 'spend-by-property': renderSpendByPropertyChart(); break;
-    case 'spend-over-time':   renderAnalyticsSpendOverTime(); break;
-    case 'cost-per-unit':     renderAnalyticsCostPerUnit(); break;
-    case 'category-trends':   renderAnalyticsCategoryTrends(); break;
-    case 'vendor-analysis':   renderAnalyticsVendorConcentration(); break;
-    case 'service-matrix':    renderServiceMatrix(); break;
-    case 'completeness':      renderCompleteness(); break;
-    case 'service-coverage':  renderServiceCoverage(); break;
-    case 'vendor-dependency': renderVendorDependency(); break;
-    case 'renewal-pipeline':  renderRenewalPipeline(); break;
-    case 'cost-benchmarks':   renderCostBenchmarks(); break;
-  }
+  requestAnimationFrame(() => {
+    switch (view) {
+      case 'spend-by-category': renderSpendByCategoryChart(); break;
+      case 'spend-by-property': renderSpendByPropertyChart(); break;
+      case 'spend-over-time':   renderAnalyticsSpendOverTime(); break;
+      case 'cost-per-unit':     renderAnalyticsCostPerUnit(); break;
+      case 'category-trends':   renderAnalyticsCategoryTrends(); break;
+      case 'vendor-analysis':   renderAnalyticsVendorConcentration(); break;
+      case 'service-matrix':    renderServiceMatrix(); break;
+      case 'completeness':      renderCompleteness(); break;
+      case 'service-coverage':  renderServiceCoverage(); break;
+      case 'vendor-dependency': renderVendorDependency(); break;
+      case 'renewal-pipeline':  renderRenewalPipeline(); break;
+      case 'cost-benchmarks':   renderCostBenchmarks(); break;
+    }
+  });
 }
 
 function renderAnalyticsSpendOverTime() {
