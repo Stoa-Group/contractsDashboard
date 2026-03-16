@@ -647,12 +647,12 @@ html.domo-dashboard-embed .page {
 
 .kpi-title,
 .kpi-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--primary-grey);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 8px 0;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px 0;
   padding-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -662,13 +662,13 @@ html.domo-dashboard-embed .page {
   word-break: break-word;
   line-height: 1.4;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .kpi-value {
   font-weight: 700;
-  font-size: clamp(14px, 2.5vw, 28px);
-  color: var(--ink);
+  font-size: clamp(20px, 3vw, 32px);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   white-space: nowrap;
@@ -680,7 +680,27 @@ html.domo-dashboard-embed .page {
   width: 100%;
   box-sizing: border-box;
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  font-family: var(--font-medium);
+}
+
+.kpi-card.kpi-alert {
+  border-left: 3px solid var(--warning);
+}
+.kpi-card.kpi-alert .kpi-value {
+  color: var(--warning);
+}
+.kpi-card.kpi-danger {
+  border-left: 3px solid var(--error);
+}
+.kpi-card.kpi-danger .kpi-value {
+  color: var(--error);
+}
+.kpi-card.kpi-attention {
+  border-left: 3px solid #f97316;
+}
+.kpi-card.kpi-attention .kpi-value {
+  color: #f97316;
 }
 
 .kpi-change,
