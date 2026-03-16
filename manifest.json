@@ -1,10 +1,12 @@
 {
-  "name": "Contracts Dashboard",
+  "name": "Property Operations",
   "version": "0.0.1",
   "size": {
     "width": 1,
     "height": 1
   },
   "fullpage": true,
-  "fileName": "manifest.json"
+  "fileName": "manifest.json",
+  "id": "4c415e36-66cf-4a22-8571-868a9682d2a7",
+  "datasetsMapping": []
 }

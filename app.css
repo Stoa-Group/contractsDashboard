@@ -1927,6 +1927,12 @@ html.domo-dashboard-embed .page {
   border-color: #fbbf24;
 }
 
+.badge-archived {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+
 .badge-cancelled,
 .badge-neutral {
   background: linear-gradient(135deg, #f3f4f6, #e5e7eb);

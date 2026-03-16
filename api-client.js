@@ -259,6 +259,34 @@
   }
 
   // ============================================================
+  // ENHANCED ANALYTICS
+  // ============================================================
+
+  async function getServiceMatrix() {
+    return apiRequest('/api/contracts/analytics/service-matrix');
+  }
+
+  async function getCompleteness() {
+    return apiRequest('/api/contracts/analytics/completeness');
+  }
+
+  async function getServiceCoverage() {
+    return apiRequest('/api/contracts/analytics/service-coverage');
+  }
+
+  async function getVendorDependency() {
+    return apiRequest('/api/contracts/analytics/vendor-dependency');
+  }
+
+  async function getRenewalPipeline() {
+    return apiRequest('/api/contracts/analytics/renewal-pipeline');
+  }
+
+  async function getCostBenchmarks() {
+    return apiRequest('/api/contracts/analytics/cost-benchmarks');
+  }
+
+  // ============================================================
   // EMAIL
   // ============================================================
 
@@ -270,8 +298,18 @@
   // EXPOSE ALL FUNCTIONS TO API OBJECT
   // ============================================================
 
+  async function verifyAuth(token) {
+    return apiRequest('/api/auth/verify', 'GET', null, token);
+  }
+
+  async function getCurrentUser(token) {
+    return apiRequest('/api/auth/me', 'GET', null, token);
+  }
+
   API.login = login;
   API.loginWithDomo = loginWithDomo;
+  API.verifyAuth = verifyAuth;
+  API.getCurrentUser = getCurrentUser;
 
   API.getAllProjects = getAllProjects;
   API.getAllPersons = getAllPersons;
@@ -306,6 +344,13 @@
   API.getSpendByProperty = getSpendByProperty;
   API.getSpendOverTime = getSpendOverTime;
   API.getContractHistory = getContractHistory;
+
+  API.getServiceMatrix = getServiceMatrix;
+  API.getCompleteness = getCompleteness;
+  API.getServiceCoverage = getServiceCoverage;
+  API.getVendorDependency = getVendorDependency;
+  API.getRenewalPipeline = getRenewalPipeline;
+  API.getCostBenchmarks = getCostBenchmarks;
 
   API.sendExpiryReminders = sendExpiryReminders;
 

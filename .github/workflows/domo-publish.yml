@@ -1,0 +1,48 @@
+name: Publish to Domo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Domo CLI (ryuu)
+        run: |
+          npm cache clean --force
+          npm install -g ryuu --prefer-online --no-audit --no-fund || \
+          npm install -g ryuu --registry https://registry.npmmirror.com --prefer-online --no-audit --no-fund
+
+      - name: Fix ryuu inquirer dependency
+        run: cd $(npm root -g)/ryuu && npm install inquirer --save || true
+
+      - name: Login to Domo
+        env:
+          DOMO_INSTANCE: ${{ secrets.DOMO_INSTANCE || 'stoagroup.domo.com' }}
+          DOMO_TOKEN: ${{ secrets.DOMO_TOKEN || secrets.DOMO_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$DOMO_TOKEN" ]; then
+            domo login -i "$DOMO_INSTANCE" -t "$DOMO_TOKEN"
+          else
+            echo "Set DOMO_TOKEN or DOMO_ACCESS_TOKEN in repo secrets"
+            exit 1
+          fi
+
+      - name: Stage publish files
+        run: |
+          mkdir -p /tmp/publish
+          cp manifest.json index.html app.js app.css api-client.js package.json /tmp/publish/
+          cp -r Logos /tmp/publish/ 2>/dev/null || true
+
+      - name: Publish to Domo
+        run: domo publish
+        working-directory: /tmp/publish

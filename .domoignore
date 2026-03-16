@@ -1,0 +1,8 @@
+sampledata
+LOCAL_DEV.md
+node_modules
+.git
+.github
+.cursor
+package-lock.json
+*.md

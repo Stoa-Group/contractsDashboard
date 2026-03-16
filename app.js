@@ -165,7 +165,9 @@ function getStatusBadge(status) {
   let cls = 'badge-default';
   if (s === 'active') cls = 'badge-success';
   else if (s === 'pending' || s === 'under review') cls = 'badge-warning';
-  else if (s === 'expired' || s === 'terminated') cls = 'badge-danger';
+  else if (s === 'expired' || s === 'terminated' || s === 'cancelled') cls = 'badge-danger';
+  else if (s === 'archived') cls = 'badge-archived';
+  else if (s === 'renewed') cls = 'badge-neutral';
   return `<span class="badge ${cls}">${escapeHtml(status || 'Unknown')}</span>`;
 }
 
@@ -787,6 +789,8 @@ function renderKPIs() {
     ? (analyticsSummary.expiredCount ?? analyticsSummary.expired ?? 0)
     : allContracts.filter(c => (c.Status || '').toLowerCase() === 'expired').length;
 
+  const archived = allContracts.filter(c => (c.Status || '').toLowerCase() === 'archived').length;
+
   const nonCancellable = active.filter(c => c.IsNonCancellable === true || c.IsNonCancellable === 1).length;
   const withEscalation = active.filter(c => c.AnnualEscalation).length;
   const totalSetupFees = active.reduce((s, c) => s + (parseFloat(c.OneTimeSetupFee) || 0), 0);
@@ -797,6 +801,7 @@ function renderKPIs() {
   setKPI('#kpi-expiring-30', expiring30, expiring30 > 0 ? 'kpi-alert' : '');
   setKPI('#kpi-expiring-60', expiring60, expiring60 > 0 ? 'kpi-attention' : '');
   setKPI('#kpi-expired', expired, expired > 0 ? 'kpi-danger' : '');
+  setKPI('#kpi-archived', archived);
   setKPI('#kpi-non-cancellable', nonCancellable, nonCancellable > 0 ? 'kpi-attention' : '');
   setKPI('#kpi-with-escalation', withEscalation);
   setKPI('#kpi-setup-fees', formatCurrencyWhole(totalSetupFees));
@@ -1545,6 +1550,7 @@ function renderVendorView(globalSearch) {
       Email: v.ContactEmail || v.Email || '—',
       Phone: v.ContactPhone || v.Phone || '—',
       Website: v.Website || '',
+      Address: v.Address || '',
       ContractCount: contracts.length,
       ActiveCount: activeContracts.length,
       TotalSpend: totalAnnual,
@@ -1565,6 +1571,7 @@ function renderVendorView(globalSearch) {
         Email: '—',
         Phone: '—',
         Website: '',
+        Address: '',
         ContractCount: contracts.length,
         ActiveCount: contracts.filter(c => (c.Status || '').toLowerCase() === 'active').length,
         TotalSpend: totalAnnual,
@@ -1600,6 +1607,7 @@ function renderVendorView(globalSearch) {
       <td data-label="Vendor">
         <strong>${escapeHtml(r.VendorName)}</strong>
         ${r.Website ? `<br><a href="${escapeHtml(r.Website)}" target="_blank" rel="noopener" class="subtle-link">${escapeHtml(r.Website.replace(/^https?:\/\//, ''))}</a>` : ''}
+        ${r.Address ? `<br><small class="subtle">${escapeHtml(r.Address)}</small>` : ''}
       </td>
       <td data-label="Contact">${escapeHtml(r.ContactName)}</td>
       <td data-label="Email">${r.Email !== '—' ? `<a href="mailto:${escapeHtml(r.Email)}" class="subtle-link">${escapeHtml(r.Email)}</a>` : '—'}</td>
@@ -2853,6 +2861,7 @@ function openContractModal(contractId) {
       setFormChecked('#contractNonCancellable', c.IsNonCancellable === true || c.IsNonCancellable === 1);
       setFormVal('#contractRenewalTermType', c.RenewalTermType || '');
       setFormVal('#contractAccountRep', c.AccountRepresentative || '');
+      setFormVal('#contractReminderDays', c.ReminderDaysBefore || 60);
 
       if (attachmentsEl) loadContractAttachments(contractId, attachmentsEl, false);
     }
@@ -2967,7 +2976,8 @@ async function saveContract(e) {
     ContractScope: ($('#contractScope') || {}).value || null,
     IsNonCancellable: !!($('#contractNonCancellable') || {}).checked,
     RenewalTermType: ($('#contractRenewalTermType') || {}).value || null,
-    AccountRepresentative: ($('#contractAccountRep') || {}).value || null
+    AccountRepresentative: ($('#contractAccountRep') || {}).value || null,
+    ReminderDaysBefore: parseInt(($('#contractReminderDays') || {}).value, 10) || 60
   };
 
   try {
@@ -3325,6 +3335,7 @@ function openVendorModal(vendorId) {
       setFormVal('#vendorContactEmail', v.ContactEmail || v.Email || '');
       setFormVal('#vendorContactPhone', v.ContactPhone || v.Phone || '');
       setFormVal('#vendorWebsite', v.Website || '');
+      setFormVal('#vendorAddress', v.Address || '');
       setFormVal('#vendorNotes', v.Notes || '');
     }
   }
@@ -3352,6 +3363,7 @@ async function saveVendor(e) {
     ContactEmail: ($('#vendorContactEmail') || {}).value || null,
     ContactPhone: ($('#vendorContactPhone') || {}).value || null,
     Website: ($('#vendorWebsite') || {}).value || null,
+    Address: ($('#vendorAddress') || {}).value || null,
     Notes: ($('#vendorNotes') || {}).value || null
   };
 

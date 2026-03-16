@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "npx --yes serve -l 8080",
-    "dev": "npx --yes serve -l 8080"
+    "dev": "npx --yes serve -l 8080",
+    "publish": "mkdir -p /tmp/contracts-dashboard-publish && cp manifest.json index.html app.js app.css api-client.js package.json /tmp/contracts-dashboard-publish/ && cp -r Logos /tmp/contracts-dashboard-publish/ 2>/dev/null; cd /tmp/contracts-dashboard-publish && domo publish"
   }
 }
