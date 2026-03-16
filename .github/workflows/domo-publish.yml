@@ -1,3 +1,4 @@
+# Publish to Domo when code is pushed to main
 name: Publish to Domo
 
 on:
@@ -28,19 +29,22 @@ jobs:
       - name: Login to Domo
         env:
           DOMO_INSTANCE: ${{ secrets.DOMO_INSTANCE || 'stoagroup.domo.com' }}
-          DOMO_TOKEN: ${{ secrets.DOMO_TOKEN || secrets.DOMO_ACCESS_TOKEN }}
+          DOMO_TOKEN: ${{ secrets.DOMO_TOKEN }}
+          DOMO_ACCESS_TOKEN: ${{ secrets.DOMO_ACCESS_TOKEN }}
         run: |
-          if [ -n "$DOMO_TOKEN" ]; then
-            domo login -i "$DOMO_INSTANCE" -t "$DOMO_TOKEN"
-          else
-            echo "Set DOMO_TOKEN or DOMO_ACCESS_TOKEN in repo secrets"
+          TOKEN="${DOMO_ACCESS_TOKEN:-$DOMO_TOKEN}"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Set DOMO_ACCESS_TOKEN or DOMO_TOKEN (Admin → Access Tokens)."
             exit 1
           fi
+          echo "Using access token..."
+          domo login -i "$DOMO_INSTANCE" -t "$TOKEN"
 
       - name: Stage publish files
         run: |
           mkdir -p /tmp/publish
           cp manifest.json index.html app.js app.css api-client.js package.json /tmp/publish/
+          cp thumbnail.png /tmp/publish/ 2>/dev/null || true
           cp -r Logos /tmp/publish/ 2>/dev/null || true
 
       - name: Publish to Domo
