@@ -174,8 +174,8 @@ function getStatusBadge(status) {
 function getAutoRenewBadge(autoRenew) {
   const isAuto = autoRenew === true || autoRenew === 1 || autoRenew === 'Yes' || autoRenew === 'true';
   return isAuto
-    ? '<span class="badge badge-success">Auto-Renew</span>'
-    : '<span class="badge badge-default">No Auto-Renew</span>';
+    ? '<span class="badge badge-success" title="This contract auto-renews at expiration">Auto-Renew</span>'
+    : '<span class="badge badge-default" title="Manual renewal required before expiration">Manual Renewal</span>';
 }
 
 function isAutoRenew(c) {
@@ -1391,20 +1391,22 @@ function renderPropertyView(globalSearch) {
     const locationLine = [r.City, r.State].filter(Boolean).join(', ');
     const unitsLine = r.Units > 0 ? ` &middot; ${r.Units} ${pluralize(r.Units, 'unit')}` : '';
 
-    return `<tr class="property-row expandable" data-project-id="${r.ProjectId}">
+    return `<tr class="property-row expandable" data-project-id="${r.ProjectId}" title="Click to view ${r.ContractCount} contract${r.ContractCount !== 1 ? 's' : ''}">
       <td data-label="Property">
+        <span class="expand-indicator">&#9654;</span>
         <strong>${escapeHtml(r.Property)}</strong>
-        ${locationLine ? `<br><small class="subtle">${escapeHtml(locationLine)}${unitsLine}</small>` : ''}
+        ${locationLine ? `<br><small class="subtle" style="margin-left:20px">${escapeHtml(locationLine)}${unitsLine}</small>` : ''}
       </td>
       <td class="num" data-label="Contracts">${r.ContractCount}</td>
       <td class="num" data-label="Monthly Spend">${formatCurrency(r.MonthlySpend)}</td>
       <td class="num" data-label="Annual Spend">${formatCurrency(r.AnnualSpend)}</td>
-      <td class="num ${r.Expiring > 0 ? getUrgencyClass(r.Status === 'critical' ? 15 : 45) : ''}" data-label="Expiring Soon">${r.Expiring > 0 ? r.Expiring : '—'}</td>
+      <td class="num days-cell ${r.Expiring > 0 ? getUrgencyClass(r.Status === 'critical' ? 15 : 45) : ''}" data-label="Expiring Soon">${r.Expiring > 0 ? r.Expiring : '—'}</td>
       <td data-label="Status">${statusBadge}</td>
     </tr>
     <tr class="detail-row" data-project-detail="${r.ProjectId}" style="display:none;">
       <td colspan="6">
         <div class="sub-table-wrap">
+          <div class="sub-table-header">Contracts for <strong>${escapeHtml(r.Property)}</strong> <small class="subtle">(${r.ContractCount} total &middot; click any row for details)</small></div>
           ${buildContractSubTable(r.contracts)}
         </div>
       </td>
@@ -1421,6 +1423,8 @@ function renderPropertyView(globalSearch) {
         detailRow.style.display = isOpen ? 'none' : showVal;
         detailRow.classList.toggle('open', !isOpen);
         row.classList.toggle('expanded', !isOpen);
+        const icon = row.querySelector('.expand-indicator');
+        if (icon) icon.textContent = isOpen ? '\u25B6' : '\u25BC';
       }
     });
   });
@@ -1467,7 +1471,7 @@ function buildContractSubTable(contracts, hideColumn) {
         const isActive = (c.Status || '').toLowerCase() === 'active';
         const urg = isActive && days !== Infinity ? getUrgencyClass(days) : '';
         const daysDisplay = days === Infinity ? '—' : (days <= 0 ? 'Expired' : days + 'd');
-        const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
+        const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm" title="Non-Cancellable contract">NC</span>' : '';
         return `<tr class="contract-row" data-urgency="${urg}" data-contract-id="${c.ContractId || c.Id}" role="button" tabindex="0" title="Click for details">
           <td data-label="Description">${escapeHtml(c.Description || '—')}${ncBadge}</td>
           ${showVendor ? `<td data-label="Vendor">${escapeHtml(vendorName(c.VendorId))}</td>` : ''}
@@ -1574,7 +1578,10 @@ function renderCategoryView(globalSearch) {
           </tr>
           <tr class="category-detail-row" data-cat-detail="${cat.CategoryId}" style="display:none;">
             <td colspan="8" style="padding:0;">
-              <div class="sub-table-wrap">${buildContractSubTable(cat.contracts, 'category')}</div>
+              <div class="sub-table-wrap">
+                <div class="sub-table-header">Contracts in <strong>${escapeHtml(cat.name)}</strong> <small class="subtle">(${cat.count} total &middot; click any row for details)</small></div>
+                ${buildContractSubTable(cat.contracts, 'category')}
+              </div>
             </td>
           </tr>`;
         }).join('')}
@@ -1700,11 +1707,12 @@ function renderVendorView(globalSearch) {
     const pct = totalPortfolioSpend > 0 ? (r.TotalSpend / totalPortfolioSpend * 100) : 0;
     const concentrationBadge = pct > 20 ? `<span class="badge badge-warning badge-sm" title="${pct.toFixed(1)}% of total spend">High Concentration</span>` : '';
     return `
-    <tr class="vendor-row expandable" data-vendor-id="${r.VendorId}">
+    <tr class="vendor-row expandable" data-vendor-id="${r.VendorId}" title="Click to view ${r.ContractCount} contract${r.ContractCount !== 1 ? 's' : ''} from ${r.VendorName}">
       <td data-label="Vendor">
+        <span class="expand-indicator">&#9654;</span>
         <strong>${escapeHtml(r.VendorName)}</strong>${concentrationBadge}
-        ${r.Website ? `<br><a href="${escapeHtml(r.Website)}" target="_blank" rel="noopener" class="subtle-link">${escapeHtml(r.Website.replace(/^https?:\/\//, ''))}</a>` : ''}
-        ${r.Address ? `<br><small class="subtle">${escapeHtml(r.Address)}</small>` : ''}
+        ${r.Website ? `<br><a href="${escapeHtml(r.Website)}" target="_blank" rel="noopener" class="subtle-link" style="margin-left:20px">${escapeHtml(r.Website.replace(/^https?:\/\//, ''))}</a>` : ''}
+        ${r.Address ? `<br><small class="subtle" style="margin-left:20px">${escapeHtml(r.Address)}</small>` : ''}
       </td>
       <td data-label="Contact">${escapeHtml(r.ContactName)}</td>
       <td data-label="Email">${r.Email !== '—' ? `<a href="mailto:${escapeHtml(r.Email)}" class="subtle-link">${escapeHtml(r.Email)}</a>` : '—'}</td>
@@ -1719,6 +1727,7 @@ function renderVendorView(globalSearch) {
     <tr class="detail-row" data-vendor-detail="${r.VendorId}" style="display:none;">
       <td colspan="7">
         <div class="sub-table-wrap">
+          <div class="sub-table-header">Contracts from <strong>${escapeHtml(r.VendorName)}</strong> <small class="subtle">(${r.ContractCount} total &middot; click any row for details)</small></div>
           ${buildContractSubTable(r.contracts, 'vendor')}
         </div>
       </td>
@@ -1737,6 +1746,8 @@ function renderVendorView(globalSearch) {
         detailRow.style.display = isOpen ? 'none' : showVal;
         detailRow.classList.toggle('open', !isOpen);
         row.classList.toggle('expanded', !isOpen);
+        const icon = row.querySelector('.expand-indicator');
+        if (icon) icon.textContent = isOpen ? '\u25B6' : '\u25BC';
       }
     });
   });
@@ -1833,7 +1844,7 @@ function renderExpiryTable(globalSearch) {
     const noticeDays = num(c.NoticePeriodDays || c.NoticePeriod || 0);
     const noticeWarning = noticeDays > 0 && days <= noticeDays && days > 0;
 
-    const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm">NC</span>' : '';
+    const ncBadge = (c.IsNonCancellable === true || c.IsNonCancellable === 1) ? ' <span class="badge badge-danger badge-sm" title="Non-Cancellable contract">NC</span>' : '';
     const renewType = c.RenewalTermType || '—';
 
     return `<tr data-urgency="${urg}">

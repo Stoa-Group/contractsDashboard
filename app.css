@@ -3004,6 +3004,57 @@ td.empty {
   background: var(--surface-2);
 }
 
+.expand-indicator {
+  display: inline-block;
+  width: 16px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-right: 4px;
+  transition: transform 0.2s ease;
+  vertical-align: middle;
+}
+
+.expandable {
+  cursor: pointer;
+}
+.expandable:hover .expand-indicator {
+  color: var(--stoa-green);
+}
+.expandable.expanded .expand-indicator {
+  color: var(--stoa-green);
+}
+
+.sub-table-header {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+.sub-table-header small {
+  font-weight: 400;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.view-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -4px 0 12px 0;
+  padding-left: 2px;
+  font-style: italic;
+}
+
 /* =========================================================
    Activity List
    ========================================================= */

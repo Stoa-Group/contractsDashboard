@@ -104,11 +104,11 @@
 
       <section class="kpi-grid kpi-alerts" aria-label="alerts">
         <div class="kpi-card" id="kpi-expiring-30">
-          <div class="kpi-label">Expiring 30d</div>
+          <div class="kpi-label">Expiring in 30 Days</div>
           <div class="kpi-value">—</div>
         </div>
         <div class="kpi-card" id="kpi-expiring-60">
-          <div class="kpi-label">Expiring 60d</div>
+          <div class="kpi-label">Expiring in 60 Days</div>
           <div class="kpi-value">—</div>
         </div>
         <div class="kpi-card" id="kpi-expired">
@@ -167,10 +167,10 @@
       </div>
 
       <div class="inline-controls">
-        <input id="propertySearch" class="search" type="search" placeholder="Search properties…" aria-label="Search properties" />
-        <div class="multi" id="statusMulti" aria-label="Filter by status" data-type="status">
+        <input id="propertySearch" class="search" type="search" placeholder="Search properties, vendors, or contracts…" aria-label="Search properties" />
+        <div class="multi" id="statusMulti" aria-label="Filter by contract status" data-type="status">
           <button class="multi-btn" type="button" aria-expanded="false">
-            <span class="multi-label">All Statuses</span>
+            <span class="multi-label">Status: All</span>
             <i class="car"></i>
           </button>
           <div class="multi-menu" role="menu" aria-hidden="true">
@@ -182,6 +182,7 @@
           </div>
         </div>
       </div>
+      <p class="view-hint">Click any property row to expand and see its contracts.</p>
 
       <section class="panel">
         <div class="table-wrap">
@@ -211,6 +212,7 @@
         <p class="view-intro-desc">Explore contracts grouped by service category — landscaping, pest control, utilities, and more.</p>
       </div>
 
+      <p class="view-hint">Click any category row to expand and see its contracts.</p>
       <section class="panel">
         <div id="category-grid" class="category-grid"></div>
       </section>
@@ -225,11 +227,12 @@
             <p class="view-intro-desc">Manage vendors, view their contracts, and track contact information.</p>
           </div>
           <div class="inline-controls">
-            <input id="vendorSearch" class="search" type="search" placeholder="Search vendors…" aria-label="Search vendors" />
+            <input id="vendorSearch" class="search" type="search" placeholder="Search vendors, contacts, or email…" aria-label="Search vendors" />
             <button id="addVendorBtn" class="btn btn-sm admin-edit-only" style="display:none;">+ Add Vendor</button>
           </div>
         </div>
       </div>
+      <p class="view-hint">Click any vendor row to expand and see their contracts.</p>
 
       <section class="panel">
         <div class="table-wrap">
@@ -261,17 +264,23 @@
       </div>
 
       <div class="inline-controls">
-        <select id="expiryTimeframe" class="form-input" aria-label="Timeframe">
-          <option value="30">Next 30 Days</option>
-          <option value="60">Next 60 Days</option>
-          <option value="90" selected>Next 90 Days</option>
-          <option value="180">Next 180 Days</option>
-        </select>
-        <select id="expiryAutoRenewFilter" class="form-input" aria-label="Auto-renew filter">
-          <option value="all">All Contracts</option>
-          <option value="auto">Auto-Renew Only</option>
-          <option value="manual">Manual Renewal Only</option>
-        </select>
+        <div class="filter-group">
+          <label class="filter-label" for="expiryTimeframe">Show contracts expiring within:</label>
+          <select id="expiryTimeframe" class="form-input" aria-label="Timeframe">
+            <option value="30">Next 30 Days</option>
+            <option value="60">Next 60 Days</option>
+            <option value="90" selected>Next 90 Days</option>
+            <option value="180">Next 180 Days</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="expiryAutoRenewFilter">Renewal type:</label>
+          <select id="expiryAutoRenewFilter" class="form-input" aria-label="Auto-renew filter">
+            <option value="all">All Contracts</option>
+            <option value="auto">Auto-Renew Only</option>
+            <option value="manual">Manual Renewal Only</option>
+          </select>
+        </div>
         <button id="bulkReminderBtn" class="btn btn-sm admin-edit-only" style="display:none;">Send Bulk Reminder</button>
       </div>
 
