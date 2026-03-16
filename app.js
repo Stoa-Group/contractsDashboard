@@ -60,6 +60,9 @@ let allProjects = [];
 let allPersons = [];
 let allCategories = [];
 let allVendors = [];
+let _rawProjects = [];
+let _rawContracts = [];
+let _rawSpendByPropertyData = [];
 let analyticsSummary = null;
 let spendByCategoryData = [];
 let spendByPropertyData = [];
@@ -322,18 +325,39 @@ function projectUnits(id) {
 }
 
 const ACTIVE_PROPERTY_STAGES = ['under construction', 'lease-up', 'stabilized', 'under contract'];
+
+function getAllowedStages() {
+  const includeLiquidated = $('#includeLiquidated');
+  const stages = [...ACTIVE_PROPERTY_STAGES];
+  if (includeLiquidated && includeLiquidated.checked) stages.push('liquidated');
+  return stages;
+}
+
 function isActiveProperty(projectId) {
   const p = lookupProject(projectId);
   if (!p) return false;
   const stage = (p.Stage || '').toLowerCase();
-  return ACTIVE_PROPERTY_STAGES.includes(stage);
+  return getAllowedStages().includes(stage);
 }
 
 function getPortfolioProjects() {
-  return allProjects.filter(p => {
+  return allProjects;
+}
+
+function applyStageFilter() {
+  const stages = getAllowedStages();
+  allProjects = _rawProjects.filter(p => {
     const stage = (p.Stage || '').toLowerCase();
-    return ACTIVE_PROPERTY_STAGES.includes(stage);
+    return stages.includes(stage);
   });
+  const activeProjectIds = new Set(allProjects.map(p => p.ProjectId || p.Id));
+  allContracts = _rawContracts.filter(c => activeProjectIds.has(c.ProjectId));
+  spendByPropertyData = _rawSpendByPropertyData.filter(d => {
+    const name = d.ProjectName || '';
+    return allProjects.some(p => (p.ProjectName || '') === name);
+  });
+  analyticsSummary = buildLocalAnalyticsSummary();
+  console.log(`[Filter] ${allProjects.length} projects, ${allContracts.length} contracts (stages: ${stages.join(', ')})`);
 }
 
 function vendorName(id) {
@@ -474,22 +498,11 @@ async function loadAllData() {
     if (c.DaysUntilExpiry == null && c.ExpirationDate) c.DaysUntilExpiry = daysUntil(c.ExpirationDate);
   });
 
-  const beforeProjectFilter = allProjects.length;
-  allProjects = allProjects.filter(p => {
-    const stage = (p.Stage || '').toLowerCase();
-    return ACTIVE_PROPERTY_STAGES.includes(stage);
-  });
-  console.log(`[Filter] ${allProjects.length} of ${beforeProjectFilter} projects are active portfolio properties`);
+  _rawProjects = [...allProjects];
+  _rawContracts = [...allContracts];
+  _rawSpendByPropertyData = [...spendByPropertyData];
 
-  const activeProjectIds = new Set(allProjects.map(p => p.ProjectId || p.Id));
-  const beforeFilter = allContracts.length;
-  allContracts = allContracts.filter(c => activeProjectIds.has(c.ProjectId));
-  console.log(`[Filter] Showing ${allContracts.length} of ${beforeFilter} contracts (active portfolio properties only)`);
-
-  spendByPropertyData = spendByPropertyData.filter(d => {
-    const name = d.ProjectName || '';
-    return allProjects.some(p => (p.ProjectName || '') === name);
-  });
+  applyStageFilter();
 
   if (results[5].status === 'fulfilled' && results[5].value && results[5].value.success) {
     analyticsSummary = results[5].value.data;
@@ -3831,6 +3844,15 @@ function bindEventListeners() {
       if (tab) switchTab(tab);
     });
   });
+
+  const liquidatedToggle = $('#includeLiquidated');
+  if (liquidatedToggle) {
+    liquidatedToggle.addEventListener('change', () => {
+      applyStageFilter();
+      renderedTabs.clear();
+      renderCurrentTab();
+    });
+  }
 
   const loginBtn = $('#loginBtn');
   if (loginBtn) {

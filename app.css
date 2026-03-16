@@ -344,6 +344,35 @@ html.domo-dashboard-embed .page {
   min-width: 0;
 }
 
+.liquidated-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.liquidated-toggle:hover {
+  border-color: var(--primary-green);
+}
+.liquidated-toggle input[type="checkbox"] {
+  accent-color: var(--primary-green);
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.liquidated-toggle .toggle-label {
+  line-height: 1;
+}
+
 .admin-badge {
   display: inline-flex;
   align-items: center;
@@ -3948,6 +3977,14 @@ td.empty {
 
 [data-mobile="true"] .admin-badge {
   display: none;
+}
+[data-mobile="true"] .liquidated-toggle .toggle-label {
+  display: none;
+}
+[data-mobile="true"] .liquidated-toggle {
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
 }
 
 [data-mobile="true"] .controls .search {
