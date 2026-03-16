@@ -444,7 +444,10 @@
 
         <section class="panel" data-chart="service-matrix">
           <div class="panel-head">
-            <div class="panel-title">Service Comparison Matrix</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Service Comparison Matrix</div>
+              <p class="panel-desc">Shows which service categories are covered at each property. <strong>Green</strong> = active contract with cost data. <strong>Yellow</strong> = contract exists but no cost entered. <strong>Dash</strong> = no contract for that service. Use this to spot coverage gaps and compare vendor assignments across the portfolio.</p>
+            </div>
           </div>
           <div class="panel-body">
             <div id="service-matrix-container" class="service-matrix-wrap"></div>
@@ -463,7 +466,10 @@
 
         <section class="panel" data-chart="service-coverage">
           <div class="panel-head">
-            <div class="panel-title">Portfolio Service Coverage</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Portfolio Service Coverage</div>
+              <p class="panel-desc">Monthly contract spend per unit at each property. Higher cost-per-unit may indicate premium services or inefficiencies worth reviewing.</p>
+            </div>
           </div>
           <div class="panel-body">
             <div id="service-coverage-container"></div>
@@ -472,7 +478,10 @@
 
         <section class="panel" data-chart="vendor-dependency">
           <div class="panel-head">
-            <div class="panel-title">Vendor Dependency Analysis</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Vendor Dependency Analysis</div>
+              <p class="panel-desc">Identifies vendors used across multiple properties. High dependency on a single vendor increases risk if they raise prices or discontinue service.</p>
+            </div>
           </div>
           <div class="panel-body">
             <div id="vendor-dependency-container"></div>
@@ -496,7 +505,10 @@
 
         <section class="panel" data-chart="cost-benchmarks">
           <div class="panel-head">
-            <div class="panel-title">Cost Benchmarking</div>
+            <div class="panel-title-wrap">
+              <div class="panel-title">Cost Benchmarking</div>
+              <p class="panel-desc">Compares the cost of the same service category across properties to highlight outliers. Useful for renegotiating or standardizing vendor pricing.</p>
+            </div>
           </div>
           <div class="panel-body">
             <div id="cost-benchmarks-container"></div>

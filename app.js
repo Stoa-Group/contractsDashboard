@@ -321,6 +321,21 @@ function projectUnits(id) {
   return p ? num(p.Units || p.UnitCount || 0) : 0;
 }
 
+const ACTIVE_PROPERTY_STAGES = ['under construction', 'lease-up', 'stabilized', 'under contract'];
+function isActiveProperty(projectId) {
+  const p = lookupProject(projectId);
+  if (!p) return false;
+  const stage = (p.Stage || '').toLowerCase();
+  return ACTIVE_PROPERTY_STAGES.includes(stage);
+}
+
+function getPortfolioProjects() {
+  return allProjects.filter(p => {
+    const stage = (p.Stage || '').toLowerCase();
+    return ACTIVE_PROPERTY_STAGES.includes(stage);
+  });
+}
+
 function vendorName(id) {
   const v = lookupVendor(id);
   return v ? (v.VendorName || v.Name || 'Unknown') : 'Unknown';
@@ -457,6 +472,15 @@ async function loadAllData() {
   allContracts.forEach(c => {
     if (c.ContractCategoryId && !c.CategoryId) c.CategoryId = c.ContractCategoryId;
     if (c.DaysUntilExpiry == null && c.ExpirationDate) c.DaysUntilExpiry = daysUntil(c.ExpirationDate);
+  });
+
+  const beforeFilter = allContracts.length;
+  allContracts = allContracts.filter(c => isActiveProperty(c.ProjectId));
+  console.log(`[Filter] Showing ${allContracts.length} of ${beforeFilter} contracts (active portfolio properties only)`);
+
+  spendByPropertyData = spendByPropertyData.filter(d => {
+    const name = d.ProjectName || '';
+    return getPortfolioProjects().some(p => (p.ProjectName || '') === name);
   });
 
   if (results[5].status === 'fulfilled' && results[5].value && results[5].value.success) {
@@ -1058,12 +1082,23 @@ function createChart(canvasId, config, key) {
     parent.style.position = 'relative';
   }
 
+  const isHorizontal = config.options && config.options.indexAxis === 'y';
+  if (isHorizontal && config.data && config.data.labels) {
+    const barCount = config.data.labels.length;
+    const h = Math.max(300, barCount * 36 + 60);
+    parent.style.height = h + 'px';
+    canvas.style.height = h + 'px';
+  } else {
+    parent.style.height = '350px';
+    canvas.style.height = '350px';
+  }
+
   const ctx = canvas.getContext('2d');
   try {
     chartInstances[key] = new Chart(ctx, config);
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       if (chartInstances[key]) chartInstances[key].resize();
-    });
+    }, 50);
   } catch (err) {
     console.error(`[Chart] Failed to create "${key}":`, err);
     return null;
