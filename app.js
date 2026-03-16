@@ -1514,6 +1514,8 @@ function renderCategoryView(globalSearch) {
     grouped[cid].push(c);
   });
 
+  const totalMonthlyAll = allContracts.reduce((s, c) => s + getContractMonthly(c), 0);
+
   const categories = Object.entries(grouped).map(([cid, contracts]) => {
     const catObj = lookupCategory(parseInt(cid, 10) || cid);
     const name = catObj ? (catObj.CategoryName || catObj.Name || 'Uncategorized') : 'Uncategorized';
@@ -1539,57 +1541,56 @@ function renderCategoryView(globalSearch) {
     return;
   }
 
-  grid.innerHTML = categories.map(cat => {
-    const pctOfTotal = (() => {
-      const total = categories.reduce((s, c) => s + c.monthlySpend, 0);
-      return total > 0 ? ((cat.monthlySpend / total) * 100).toFixed(1) : '0.0';
-    })();
-
-    return `<div class="category-card" data-category-id="${cat.CategoryId}">
-      <div class="category-card-header">
-        <h3 class="category-card-title">${escapeHtml(cat.name)}</h3>
-        <div class="category-card-badges">
-          <span class="badge badge-default">${cat.count} ${pluralize(cat.count, 'contract')}</span>
-          ${cat.expiringSoon > 0 ? `<span class="badge badge-warning">${cat.expiringSoon} expiring</span>` : ''}
-        </div>
-      </div>
-      <div class="category-card-stats">
-        <div class="stat">
-          <span class="stat-label">Monthly</span>
-          <span class="stat-value">${formatCurrencyWhole(cat.monthlySpend)}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Annual</span>
-          <span class="stat-value">${formatCurrencyWhole(cat.annualSpend)}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Active</span>
-          <span class="stat-value">${cat.activeCount}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">% of Spend</span>
-          <span class="stat-value">${pctOfTotal}%</span>
-        </div>
-      </div>
-      <div class="category-card-expand" data-cat-detail="${cat.CategoryId}" style="display:none;">
-        ${buildContractSubTable(cat.contracts)}
-      </div>
-      <button class="category-card-toggle" type="button" aria-expanded="false">
-        <span class="toggle-text">Show Contracts</span>
-        <span class="toggle-icon">&#9660;</span>
-      </button>
+  grid.innerHTML = `
+    <div class="sub-table-wrap">
+    <table class="table category-table">
+      <thead>
+        <tr>
+          <th style="width:28px"></th>
+          <th>Category</th>
+          <th class="num">Contracts</th>
+          <th class="num">Active</th>
+          <th class="num">Monthly Spend</th>
+          <th class="num">Annual Spend</th>
+          <th class="num">% of Spend</th>
+          <th class="num">Expiring Soon</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${categories.map(cat => {
+          const pct = totalMonthlyAll > 0 ? ((cat.monthlySpend / totalMonthlyAll) * 100).toFixed(1) : '0.0';
+          return `<tr class="category-summary-row" data-category-id="${cat.CategoryId}" role="button" tabindex="0" title="Click to expand contracts">
+            <td class="cat-expand-icon">&#9654;</td>
+            <td><strong>${escapeHtml(cat.name)}</strong></td>
+            <td class="num">${cat.count}</td>
+            <td class="num">${cat.activeCount}</td>
+            <td class="num">${formatCurrencyWhole(cat.monthlySpend)}</td>
+            <td class="num">${formatCurrencyWhole(cat.annualSpend)}</td>
+            <td class="num">${pct}%</td>
+            <td class="num">${cat.expiringSoon > 0 ? `<span class="badge badge-warning">${cat.expiringSoon}</span>` : '0'}</td>
+          </tr>
+          <tr class="category-detail-row" data-cat-detail="${cat.CategoryId}" style="display:none;">
+            <td colspan="8" style="padding:0;">
+              <div class="sub-table-wrap">${buildContractSubTable(cat.contracts)}</div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
     </div>`;
-  }).join('');
 
-  grid.querySelectorAll('.category-card-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const card = btn.closest('.category-card');
-      const detail = card.querySelector('.category-card-expand');
-      const isOpen = detail.style.display !== 'none';
-      detail.style.display = isOpen ? 'none' : 'block';
-      btn.querySelector('.toggle-text').textContent = isOpen ? 'Show Contracts' : 'Hide Contracts';
-      btn.querySelector('.toggle-icon').textContent = isOpen ? '\u25BC' : '\u25B2';
-      btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+  grid.querySelectorAll('.category-summary-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const catId = row.dataset.categoryId;
+      const detailRow = grid.querySelector(`.category-detail-row[data-cat-detail="${catId}"]`);
+      const icon = row.querySelector('.cat-expand-icon');
+      const isOpen = detailRow.style.display !== 'none';
+      detailRow.style.display = isOpen ? 'none' : 'table-row';
+      icon.textContent = isOpen ? '\u25B6' : '\u25BC';
+      row.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
   });
 
@@ -2364,8 +2365,18 @@ async function renderCompleteness() {
       return;
     }
 
-    const fields = ['HasCost', 'HasStartDate', 'HasEndDate', 'HasNotice', 'HasBilling'];
-    const fieldLabels = { HasCost: 'Cost', HasStartDate: 'Start Date', HasEndDate: 'End Date', HasNotice: 'Notice', HasBilling: 'Billing' };
+    const fields = ['HasCost', 'HasStartDate', 'HasEndDate', 'HasNotice', 'HasBilling', 'HasSignedBy', 'HasContractNumber', 'HasEscalation', 'HasServiceFreq'];
+    const fieldLabels = {
+      HasCost: 'Monthly Cost Entered',
+      HasStartDate: 'Start Date Set',
+      HasEndDate: 'Expiration Date Set',
+      HasNotice: 'Notice Period Defined',
+      HasBilling: 'Billing Frequency Set',
+      HasSignedBy: 'Signer Recorded',
+      HasContractNumber: 'Contract # Entered',
+      HasEscalation: 'Escalation Terms Noted',
+      HasServiceFreq: 'Service Frequency Defined'
+    };
 
     let totalScore = 0;
     let totalMax = 0;
