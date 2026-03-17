@@ -1,4 +1,5 @@
-sampledata
+sampledata/
+sampledata/**
 LOCAL_DEV.md
 node_modules
 .git
