@@ -322,6 +322,37 @@
         <p class="view-intro-desc">Visualize spend trends, cost-per-unit breakdowns, and vendor concentration across your portfolio.</p>
       </div>
 
+      <div class="analytics-global-filters">
+        <div class="inline-controls" style="flex-wrap:wrap;gap:10px;">
+          <div class="filter-group">
+            <label class="filter-label" for="analyticsPropertyFilter">Properties</label>
+            <select id="analyticsPropertyFilter" class="form-input form-input-sm" multiple>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="analyticsRegionFilter">Region</label>
+            <select id="analyticsRegionFilter" class="form-input form-input-sm">
+              <option value="">All Regions</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="analyticsStateFilter">State</label>
+            <select id="analyticsStateFilter" class="form-input form-input-sm">
+              <option value="">All States</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="analyticsCityFilter">City</label>
+            <select id="analyticsCityFilter" class="form-input form-input-sm">
+              <option value="">All Cities</option>
+            </select>
+          </div>
+          <div class="filter-group" style="align-self:flex-end;">
+            <button class="btn btn-xs" id="analyticsResetFilters">Reset</button>
+          </div>
+        </div>
+      </div>
+
       <div class="view-switcher analytics-nav" role="navigation" aria-label="Analytics sub-views">
         <button class="view-switch analytics-nav-btn active" data-view="spend-by-category">
           <span>By Category</span>
@@ -450,10 +481,55 @@
           <div class="panel-head">
             <div class="panel-title-wrap">
               <div class="panel-title">Service Comparison Matrix</div>
-              <p class="panel-desc">Shows which service categories are covered at each property. <strong>Green</strong> = active contract with cost data. <strong>Yellow</strong> = contract exists but no cost entered. <strong>Dash</strong> = no contract for that service. Use this to spot coverage gaps and compare vendor assignments across the portfolio.</p>
+              <p class="panel-desc">Compare service coverage and costs across properties. Click any cell for details.</p>
             </div>
           </div>
           <div class="panel-body">
+            <div class="matrix-controls">
+              <div class="matrix-controls-row">
+                <div class="filter-group">
+                  <label class="filter-label">Properties</label>
+                  <select id="matrixPropertyFilter" class="form-input form-input-sm" multiple>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">Region</label>
+                  <select id="matrixRegionFilter" class="form-input form-input-sm">
+                    <option value="">All Regions</option>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">State</label>
+                  <select id="matrixStateFilter" class="form-input form-input-sm">
+                    <option value="">All States</option>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">City</label>
+                  <select id="matrixCityFilter" class="form-input form-input-sm">
+                    <option value="">All Cities</option>
+                  </select>
+                </div>
+              </div>
+              <div class="matrix-controls-row">
+                <div class="filter-group">
+                  <label class="filter-label">Categories</label>
+                  <select id="matrixCategoryFilter" class="form-input form-input-sm" multiple>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">Show Cost As</label>
+                  <select id="matrixCostMode" class="form-input form-input-sm">
+                    <option value="monthly">Monthly Total</option>
+                    <option value="perunit">Per Unit / Mo</option>
+                    <option value="annual">Annual Total</option>
+                  </select>
+                </div>
+                <div class="filter-group" style="align-self:flex-end;">
+                  <button class="btn btn-xs" id="matrixResetBtn" title="Reset filters">Reset</button>
+                </div>
+              </div>
+            </div>
             <div id="service-matrix-container" class="service-matrix-wrap"></div>
           </div>
         </section>

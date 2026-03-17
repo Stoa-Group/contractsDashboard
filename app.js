@@ -379,6 +379,76 @@ function getActiveContracts() {
   return allContracts.filter(c => (c.Status || '').toLowerCase() === 'active');
 }
 
+function getAnalyticsFilteredContracts() {
+  let contracts = getActiveContracts();
+  const regionFilter = ($('#analyticsRegionFilter') || {}).value || '';
+  const stateFilter = ($('#analyticsStateFilter') || {}).value || '';
+  const cityFilter = ($('#analyticsCityFilter') || {}).value || '';
+  const propSelect = $('#analyticsPropertyFilter');
+  const selectedProps = propSelect ? [...propSelect.selectedOptions].map(o => o.value) : [];
+
+  if (regionFilter) {
+    contracts = contracts.filter(c => {
+      const p = lookupProject(c.ProjectId);
+      return p && (p.Region || '') === regionFilter;
+    });
+  }
+  if (stateFilter) {
+    contracts = contracts.filter(c => {
+      const p = lookupProject(c.ProjectId);
+      return p && (p.State || '') === stateFilter;
+    });
+  }
+  if (cityFilter) {
+    contracts = contracts.filter(c => {
+      const p = lookupProject(c.ProjectId);
+      return p && (p.City || '') === cityFilter;
+    });
+  }
+  if (selectedProps.length > 0) {
+    contracts = contracts.filter(c => selectedProps.includes(projectName(c.ProjectId)));
+  }
+  return contracts;
+}
+
+let _analyticsFiltersPopulated = false;
+
+function populateAnalyticsFilters() {
+  if (_analyticsFiltersPopulated) return;
+  _analyticsFiltersPopulated = true;
+
+  const regions = [...new Set(allProjects.map(p => p.Region).filter(Boolean))].sort();
+  const states = [...new Set(allProjects.map(p => p.State).filter(Boolean))].sort();
+  const cities = [...new Set(allProjects.map(p => p.City).filter(Boolean))].sort();
+  const props = allProjects.map(p => p.ProjectName || p.Name).filter(Boolean).sort();
+
+  const regionSel = $('#analyticsRegionFilter');
+  const stateSel = $('#analyticsStateFilter');
+  const citySel = $('#analyticsCityFilter');
+  const propSel = $('#analyticsPropertyFilter');
+
+  if (regionSel && regionSel.options.length <= 1) regions.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; regionSel.appendChild(o); });
+  if (stateSel && stateSel.options.length <= 1) states.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stateSel.appendChild(o); });
+  if (citySel && citySel.options.length <= 1) cities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; citySel.appendChild(o); });
+  if (propSel && propSel.options.length === 0) props.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; propSel.appendChild(o); });
+
+  const refresh = () => showAnalyticsSubView(analyticsSubView);
+  [regionSel, stateSel, citySel, propSel].forEach(sel => {
+    if (sel) sel.addEventListener('change', refresh);
+  });
+
+  const resetBtn = $('#analyticsResetFilters');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (regionSel) regionSel.value = '';
+      if (stateSel) stateSel.value = '';
+      if (citySel) citySel.value = '';
+      if (propSel) [...propSel.options].forEach(o => o.selected = false);
+      refresh();
+    });
+  }
+}
+
 function getContractMonthly(c) {
   return num(c.MonthlyCost);
 }
@@ -1181,7 +1251,7 @@ function renderSpendByCategoryChart() {
     values = sorted.map(d => num(d.TotalMonthlySpend || d.totalMonthly || d.total || 0));
   } else {
     const grouped = {};
-    getActiveContracts().forEach(c => {
+    getAnalyticsFilteredContracts().forEach(c => {
       const cat = categoryName(c.CategoryId);
       grouped[cat] = (grouped[cat] || 0) + getContractMonthly(c);
     });
@@ -1243,14 +1313,14 @@ function renderSpendByPropertyChart() {
       .slice(0, 12);
   } else {
     const grouped = {};
-    getActiveContracts().forEach(c => {
+    getAnalyticsFilteredContracts().forEach(c => {
       const pName = projectName(c.ProjectId);
       grouped[pName] = (grouped[pName] || 0) + getContractMonthly(c);
     });
     data = Object.entries(grouped)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 12);
+      .slice(0, 20);
   }
 
   const labels = data.map(d => d.name);
@@ -2053,6 +2123,7 @@ function renderExpiryTimeline(globalSearch) {
 let analyticsSubView = 'spend-by-category';
 
 function renderAnalyticsView() {
+  populateAnalyticsFilters();
   showAnalyticsSubView(analyticsSubView);
 }
 
@@ -2109,7 +2180,7 @@ function renderAnalyticsSpendOverTime() {
     const now = new Date();
     labels = [];
     values = [];
-    const monthlyTotal = getActiveContracts().reduce((s, c) => s + getContractMonthly(c), 0);
+    const monthlyTotal = getAnalyticsFilteredContracts().reduce((s, c) => s + getContractMonthly(c), 0);
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       labels.push(d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
@@ -2181,7 +2252,7 @@ function renderAnalyticsSpendOverTime() {
 
 function renderAnalyticsCostPerUnit() {
   const grouped = {};
-  getActiveContracts().forEach(c => {
+  getAnalyticsFilteredContracts().forEach(c => {
     const pid = c.ProjectId;
     if (!grouped[pid]) grouped[pid] = { monthly: 0 };
     grouped[pid].monthly += getContractMonthly(c);
@@ -2259,7 +2330,8 @@ function renderAnalyticsCostPerUnit() {
 }
 
 function renderAnalyticsCategoryTrends() {
-  const catNames = [...new Set(allContracts.map(c => categoryName(c.CategoryId)))].sort();
+  const filteredContracts = getAnalyticsFilteredContracts();
+  const catNames = [...new Set(filteredContracts.map(c => categoryName(c.CategoryId)))].sort();
   const now = new Date();
   const months = [];
   for (let i = 5; i >= 0; i--) {
@@ -2270,7 +2342,7 @@ function renderAnalyticsCategoryTrends() {
   const topCats = catNames.slice(0, 8);
 
   const datasets = topCats.map((cat, i) => {
-    const contracts = getActiveContracts().filter(c => categoryName(c.CategoryId) === cat);
+    const contracts = filteredContracts.filter(c => categoryName(c.CategoryId) === cat);
     const monthly = contracts.reduce((s, c) => s + getContractMonthly(c), 0);
     const color = STOA_COLORS_EXTENDED[i % STOA_COLORS_EXTENDED.length];
 
@@ -2315,7 +2387,7 @@ function renderAnalyticsCategoryTrends() {
 
 function renderAnalyticsVendorConcentration() {
   const grouped = {};
-  getActiveContracts().forEach(c => {
+  getAnalyticsFilteredContracts().forEach(c => {
     const vName = vendorName(c.VendorId);
     grouped[vName] = (grouped[vName] || 0) + getContractAnnual(c);
   });
@@ -2388,8 +2460,10 @@ function renderAnalyticsVendorConcentration() {
 }
 
 // ============================================================
-//  ENHANCED ANALYTICS – SERVICE MATRIX
+//  ENHANCED ANALYTICS – SERVICE MATRIX (v2)
 // ============================================================
+
+let _matrixData = null;
 
 async function renderServiceMatrix() {
   const container = document.getElementById('service-matrix-container');
@@ -2397,19 +2471,51 @@ async function renderServiceMatrix() {
   container.innerHTML = '<p class="text-muted" style="padding:16px;">Loading service matrix…</p>';
 
   try {
-    const res = await API.getServiceMatrix();
-    const rows = (res && res.data) || [];
+    if (!_matrixData) {
+      const res = await API.getServiceMatrix();
+      _matrixData = (res && res.data) || [];
+    }
 
+    const rows = _matrixData;
     if (rows.length === 0) {
       container.innerHTML = '<p class="text-muted" style="padding:16px;">No active contracts found.</p>';
       return;
     }
 
-    const categories = [...new Set(rows.map(r => r.CategoryName || 'Uncategorized'))].sort();
-    const properties = [...new Set(rows.map(r => r.ProjectName || 'Unknown'))].sort();
+    populateMatrixFilters(rows);
+
+    const regionFilter = ($('#matrixRegionFilter') || {}).value || '';
+    const stateFilter = ($('#matrixStateFilter') || {}).value || '';
+    const cityFilter = ($('#matrixCityFilter') || {}).value || '';
+    const propSelect = $('#matrixPropertyFilter');
+    const selectedProps = propSelect ? [...propSelect.selectedOptions].map(o => o.value) : [];
+    const catSelect = $('#matrixCategoryFilter');
+    const selectedCats = catSelect ? [...catSelect.selectedOptions].map(o => o.value) : [];
+    const costMode = ($('#matrixCostMode') || {}).value || 'monthly';
+
+    let filtered = rows;
+    if (regionFilter) filtered = filtered.filter(r => (r.Region || '') === regionFilter);
+    if (stateFilter) filtered = filtered.filter(r => (r.State || '') === stateFilter);
+    if (cityFilter) filtered = filtered.filter(r => (r.City || '') === cityFilter);
+    if (selectedProps.length > 0) filtered = filtered.filter(r => selectedProps.includes(r.ProjectName || 'Unknown'));
+    if (selectedCats.length > 0) filtered = filtered.filter(r => selectedCats.includes(r.CategoryName || 'Uncategorized'));
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="padding:16px;">No contracts match the current filters.</p>';
+      return;
+    }
+
+    const categories = [...new Set(filtered.map(r => r.CategoryName || 'Uncategorized'))].sort();
+    const propNames = [...new Set(filtered.map(r => r.ProjectName || 'Unknown'))].sort();
+
+    const propMeta = {};
+    filtered.forEach(r => {
+      const pn = r.ProjectName || 'Unknown';
+      if (!propMeta[pn]) propMeta[pn] = { units: r.Units || 0, city: r.City || '', state: r.State || '' };
+    });
 
     const lookup = {};
-    rows.forEach(r => {
+    filtered.forEach(r => {
       const key = (r.CategoryName || 'Uncategorized') + '||' + (r.ProjectName || 'Unknown');
       if (!lookup[key]) lookup[key] = [];
       lookup[key].push(r);
@@ -2424,28 +2530,52 @@ async function renderServiceMatrix() {
       <table class="service-matrix">
         <thead><tr><th>Service</th>`;
 
-    properties.forEach(p => {
-      const short = p.length > 18 ? p.substring(0, 16) + '…' : p;
-      html += `<th title="${esc(p)}">${esc(short)}</th>`;
+    propNames.forEach(p => {
+      const meta = propMeta[p] || {};
+      const short = p.length > 20 ? p.substring(0, 18) + '…' : p;
+      html += `<th title="${esc(p)} — ${meta.city}, ${meta.state} (${meta.units} units)">
+        ${esc(short)}
+        <span class="matrix-prop-units">${meta.units} units</span>
+      </th>`;
     });
     html += '</tr></thead><tbody>';
 
     categories.forEach(cat => {
-      html += `<tr><td>${esc(cat)}</td>`;
-      properties.forEach(prop => {
+      html += `<tr><td><strong>${esc(cat)}</strong></td>`;
+      propNames.forEach(prop => {
         const key = cat + '||' + prop;
         const contracts = lookup[key];
+        const units = (propMeta[prop] || {}).units || 0;
+
         if (!contracts || contracts.length === 0) {
-          html += '<td class="matrix-cell matrix-cell-empty">—</td>';
+          html += '<td class="matrix-cell matrix-cell-empty" title="No contract">—</td>';
         } else {
+          const totalMonthly = contracts.reduce((s, c) => s + (parseFloat(c.MonthlyCost) || 0), 0);
+          const totalAnnual = contracts.reduce((s, c) => s + (parseFloat(c.AnnualCost) || 0), 0);
+          const hasCost = totalMonthly > 0 || totalAnnual > 0;
+          const effectiveAnnual = totalAnnual > 0 ? totalAnnual : totalMonthly * 12;
+          const perUnit = units > 0 && effectiveAnnual > 0 ? effectiveAnnual / 12 / units : 0;
+
+          let displayCost;
+          if (costMode === 'perunit') {
+            displayCost = perUnit > 0 ? formatCurrency(perUnit) + '/u/mo' : 'N/A';
+          } else if (costMode === 'annual') {
+            displayCost = effectiveAnnual > 0 ? formatCurrency(effectiveAnnual) + '/yr' : 'No cost';
+          } else {
+            displayCost = totalMonthly > 0 ? formatCurrency(totalMonthly) + '/mo' : (totalAnnual > 0 ? formatCurrency(totalAnnual / 12) + '/mo' : 'No cost');
+          }
+
+          const bgStyle = hasCost ? '' : 'style="background:#fef9c3;"';
           const c = contracts[0];
-          const cost = parseFloat(c.MonthlyCost);
-          const hasCost = Number.isFinite(cost) && cost > 0;
-          const bgClass = hasCost ? '' : 'style="background:#fef9c3;"';
-          html += `<td class="matrix-cell" ${bgClass}>
+          const tooltipLines = contracts.map(ct =>
+            `${ct.VendorName || '—'}: ${ct.Description || '—'} — ${parseFloat(ct.MonthlyCost) > 0 ? formatCurrency(ct.MonthlyCost) + '/mo' : 'no cost'}`
+          ).join('\n');
+
+          html += `<td class="matrix-cell" ${bgStyle} title="${esc(tooltipLines)}" data-contract-id="${c.ContractId || ''}">
             <div class="matrix-cell-vendor">${esc(c.VendorName || '—')}</div>
-            <div class="matrix-cell-cost">${hasCost ? formatCurrency(cost) + '/mo' : 'No cost'}</div>
-            ${contracts.length > 1 ? '<div class="matrix-cell-cost">+' + (contracts.length - 1) + ' more</div>' : ''}
+            <div class="matrix-cell-cost">${displayCost}</div>
+            <div class="matrix-cell-desc">${esc(c.Description || '')}</div>
+            ${contracts.length > 1 ? '<div class="matrix-cell-cost" style="color:var(--accent);">+' + (contracts.length - 1) + ' more</div>' : ''}
           </td>`;
         }
       });
@@ -2454,9 +2584,62 @@ async function renderServiceMatrix() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+
+    container.querySelectorAll('.matrix-cell[data-contract-id]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = parseInt(cell.dataset.contractId, 10);
+        if (id) openDetailModal(id);
+      });
+    });
+
   } catch (err) {
     console.error('Service Matrix error:', err);
     container.innerHTML = '<p class="text-muted" style="padding:16px;">Failed to load service matrix.</p>';
+  }
+}
+
+let _matrixFiltersPopulated = false;
+
+function populateMatrixFilters(rows) {
+  if (_matrixFiltersPopulated) return;
+  _matrixFiltersPopulated = true;
+
+  const regions = [...new Set(rows.map(r => r.Region).filter(Boolean))].sort();
+  const states = [...new Set(rows.map(r => r.State).filter(Boolean))].sort();
+  const cities = [...new Set(rows.map(r => r.City).filter(Boolean))].sort();
+  const props = [...new Set(rows.map(r => r.ProjectName).filter(Boolean))].sort();
+  const cats = [...new Set(rows.map(r => r.CategoryName).filter(Boolean))].sort();
+
+  const regionSel = $('#matrixRegionFilter');
+  const stateSel = $('#matrixStateFilter');
+  const citySel = $('#matrixCityFilter');
+  const propSel = $('#matrixPropertyFilter');
+  const catSel = $('#matrixCategoryFilter');
+
+  if (regionSel) regions.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; regionSel.appendChild(o); });
+  if (stateSel) states.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stateSel.appendChild(o); });
+  if (citySel) cities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; citySel.appendChild(o); });
+  if (propSel) props.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; propSel.appendChild(o); });
+  if (catSel) cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+
+  [regionSel, stateSel, citySel, propSel, catSel].forEach(sel => {
+    if (sel) sel.addEventListener('change', () => renderServiceMatrix());
+  });
+
+  const costMode = $('#matrixCostMode');
+  if (costMode) costMode.addEventListener('change', () => renderServiceMatrix());
+
+  const resetBtn = $('#matrixResetBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (regionSel) regionSel.value = '';
+      if (stateSel) stateSel.value = '';
+      if (citySel) citySel.value = '';
+      if (propSel) [...propSel.options].forEach(o => o.selected = false);
+      if (catSel) [...catSel.options].forEach(o => o.selected = false);
+      if (costMode) costMode.value = 'monthly';
+      renderServiceMatrix();
+    });
   }
 }
 
