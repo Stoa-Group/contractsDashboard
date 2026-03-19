@@ -77,6 +77,9 @@
     <button class="main-tab" data-tab="analytics" role="tab" aria-selected="false">
       <span>Analytics</span>
     </button>
+    <button class="main-tab" id="pmMgmtTab" data-tab="pm-management" role="tab" aria-selected="false" style="display:none">
+      <span>PM Management</span>
+    </button>
   </nav>
 
   <main class="page">
@@ -594,6 +597,17 @@
             <div id="cost-benchmarks-container"></div>
           </div>
         </section>
+      </div>
+    </section>
+
+    <!-- PM Management (Admin only) -->
+    <section id="view-pm-management" class="view">
+      <div class="view-intro">
+        <h2 class="view-intro-title">Property Manager Management</h2>
+        <p class="view-intro-desc">Manage Property Manager roles and property assignments.</p>
+      </div>
+      <div id="pm-mgmt-content" class="panel" style="padding:20px">
+        <div class="hint">Loading...</div>
       </div>
     </section>
 

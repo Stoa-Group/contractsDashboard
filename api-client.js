@@ -354,6 +354,15 @@
 
   API.sendExpiryReminders = sendExpiryReminders;
 
+  // PM Management (Admin only, shared with T12 backend)
+  API.getAdminUsers = function() { return apiRequest('/api/t12/admin/users'); };
+  API.getPropertyManagers = function() { return apiRequest('/api/t12/admin/property-managers'); };
+  API.addPropertyManager = function(name, email) { return apiRequest('/api/t12/admin/property-managers', 'POST', { name: name, email: email }); };
+  API.changeUserRole = function(userId, role) { return apiRequest('/api/t12/admin/users/' + userId + '/role', 'PUT', { role: role }); };
+  API.getAssignments = function() { return apiRequest('/api/t12/admin/assignments'); };
+  API.assignProperty = function(propertyName, data) { return apiRequest('/api/t12/admin/assignments/' + encodeURIComponent(propertyName), 'PUT', data); };
+  API.removeAssignment = function(propertyName) { return apiRequest('/api/t12/admin/assignments/' + encodeURIComponent(propertyName), 'DELETE'); };
+
   const globalScope = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : this;
 
   globalScope.API = API;

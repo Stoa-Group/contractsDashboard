@@ -88,10 +88,17 @@ let pendingFiles = [];
 let isAuthenticated = false;
 let isEditMode = false;
 let currentUser = null;
+let currentRole = 'ReadOnly';
+let assignedProperties = [];
 
 // ============================================================
 //  UTILITY FUNCTIONS
 // ============================================================
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function formatCurrency(n) {
   const v = parseFloat(n);
@@ -655,8 +662,10 @@ async function initializeAuth() {
       if (result && result.success) {
         isAuthenticated = true;
         currentUser = result.data?.user || result.user || { username: 'Admin' };
+        currentRole = currentUser.role || 'ReadOnly';
+        await applyRoleBasedAccess();
         updateAuthUI();
-        console.log('[Auth] Restored session for', currentUser.username || currentUser.email);
+        console.log('[Auth] Restored session for', currentUser.username || currentUser.email, 'role:', currentRole);
         return;
       }
     } catch (e) {
@@ -675,8 +684,10 @@ async function initializeAuth() {
           localStorage.setItem('authToken', result.data.token);
           isAuthenticated = true;
           currentUser = result.data.user || { username: domoUser.name || domoUser.email };
+          currentRole = currentUser.role || 'ReadOnly';
+          await applyRoleBasedAccess();
           updateAuthUI();
-          console.log('[Auth] Domo SSO login for', currentUser.username || currentUser.email);
+          console.log('[Auth] Domo SSO login for', currentUser.username || currentUser.email, 'role:', currentRole);
           return;
         }
       }
@@ -766,9 +777,11 @@ async function handleLogin(e) {
       localStorage.setItem('authToken', result.data.token);
       isAuthenticated = true;
       currentUser = result.data.user || { username };
+      currentRole = currentUser.role || 'ReadOnly';
+      await applyRoleBasedAccess();
       updateAuthUI();
       closeModalAnimated($('#login-modal'));
-      showToast('Logged in as ' + (currentUser.username || currentUser.email || 'Admin'), 'success');
+      showToast('Logged in as ' + (currentUser.username || currentUser.email || 'Admin') + ' (' + currentRole + ')', 'success');
       if ($('#loginForm')) $('#loginForm').reset();
     } else {
       throw new Error(result?.error?.message || result?.message || 'Login failed');
@@ -785,6 +798,8 @@ function handleLogout() {
   isAuthenticated = false;
   isEditMode = false;
   currentUser = null;
+  currentRole = 'ReadOnly';
+  assignedProperties = [];
   localStorage.removeItem('authToken');
   API.clearAuthToken();
   updateAuthUI();
@@ -795,6 +810,7 @@ function handleLogout() {
 
 function toggleEditMode() {
   if (!isAuthenticated) return;
+  if (currentRole === 'ReadOnly') return;
   isEditMode = !isEditMode;
   updateAuthUI();
   renderedTabs.clear();
@@ -805,30 +821,44 @@ function updateAuthUI() {
   const adminBadge = $('#adminBadge');
   const loginBtn = $('#loginBtn');
   const editModeBtn = $('#editModeBtn');
+  const pmMgmtTab = $('#pmMgmtTab');
 
-  if (isAuthenticated) {
-    if (adminBadge) adminBadge.style.display = '';
+  if (isAuthenticated && (currentRole === 'Admin' || currentRole === 'PropertyManager')) {
+    isEditMode = true;
+    if (adminBadge) { adminBadge.style.display = ''; adminBadge.textContent = currentRole === 'Admin' ? 'Admin' : 'PM'; }
     if (loginBtn) { loginBtn.textContent = 'Logout'; loginBtn.title = 'Click to log out'; }
-    if (editModeBtn) editModeBtn.style.display = '';
+    if (editModeBtn) editModeBtn.style.display = 'none';
+    document.body.classList.add('admin-authenticated', 'admin-edit-mode');
+  } else if (isAuthenticated) {
+    if (adminBadge) { adminBadge.style.display = ''; adminBadge.textContent = 'RO'; }
+    if (loginBtn) { loginBtn.textContent = 'Logout'; loginBtn.title = 'Click to log out'; }
+    if (editModeBtn) editModeBtn.style.display = 'none';
     document.body.classList.add('admin-authenticated');
+    document.body.classList.remove('admin-edit-mode');
   } else {
     if (adminBadge) adminBadge.style.display = 'none';
     if (loginBtn) { loginBtn.textContent = 'Login'; loginBtn.title = 'Click to log in'; }
     if (editModeBtn) editModeBtn.style.display = 'none';
-    document.body.classList.remove('admin-authenticated');
+    document.body.classList.remove('admin-authenticated', 'admin-edit-mode');
   }
 
-  if (isEditMode && isAuthenticated) {
-    if (editModeBtn) { editModeBtn.textContent = 'Exit Edit Mode'; editModeBtn.classList.add('active'); }
-    document.body.classList.add('admin-edit-mode');
-  } else {
-    if (editModeBtn) { editModeBtn.textContent = 'Edit Mode'; editModeBtn.classList.remove('active'); }
-    document.body.classList.remove('admin-edit-mode');
-  }
+  if (pmMgmtTab) pmMgmtTab.style.display = currentRole === 'Admin' ? '' : 'none';
 }
 
 function canEdit() {
-  return isAuthenticated && isEditMode;
+  return isAuthenticated && (currentRole === 'Admin' || currentRole === 'PropertyManager');
+}
+
+async function applyRoleBasedAccess() {
+  if (currentRole === 'PropertyManager') {
+    try {
+      const resp = await fetch(API.getApiBaseUrl() + '/api/t12/my-assignments', {
+        headers: { 'Authorization': 'Bearer ' + API.getAuthToken() }
+      });
+      const json = await resp.json();
+      if (json && json.data) assignedProperties = json.data;
+    } catch (e) { console.warn('[Auth] Assignment fetch failed:', e); }
+  }
 }
 
 // ============================================================
@@ -901,6 +931,7 @@ function renderCurrentTab() {
     case 'vendor':    renderVendorView(q); break;
     case 'expiry':    renderExpiryView(q); break;
     case 'analytics': renderAnalyticsView(); break;
+    case 'pm-management': renderPMManagementView(); break;
   }
   renderedTabs.add(currentTab);
 }
@@ -4267,6 +4298,121 @@ function bindEventListeners() {
       });
     }, 300);
   });
+}
+
+// ============================================================
+//  PM MANAGEMENT VIEW (Admin only)
+// ============================================================
+
+async function renderPMManagementView() {
+  const container = document.getElementById('pm-mgmt-content');
+  if (!container || currentRole !== 'Admin') return;
+
+  container.innerHTML = '<div class="hint">Loading PM data...</div>';
+
+  try {
+    const [pmResp, assignResp] = await Promise.all([
+      API.getPropertyManagers(),
+      API.getAssignments()
+    ]);
+    const pms = pmResp?.data || [];
+    const assignments = assignResp?.data || [];
+    const assignMap = {};
+    for (const a of assignments) assignMap[a.PropertyName] = a;
+
+    const properties = [...new Set(allContracts.map(c => c.PropertyName || c.Property).filter(Boolean))].sort();
+
+    let html = '<div style="margin-bottom:20px">' +
+      '<h3 style="margin:0 0 10px;font-size:16px">Add Property Manager</h3>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<input id="cPmNameInput" class="form-input form-input-sm" placeholder="Full Name" style="max-width:200px"/>' +
+      '<input id="cPmEmailInput" class="form-input form-input-sm" placeholder="name@stoagroup.com" style="max-width:250px"/>' +
+      '<button id="cBtnAddPM" class="btn btn-sm">Add Property Manager</button>' +
+      '</div></div>';
+
+    html += '<h3 style="margin:20px 0 10px;font-size:16px">Property Managers</h3>';
+    if (pms.length) {
+      html += '<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Email</th><th>Assigned Properties</th><th>Last Login</th><th></th></tr></thead><tbody>';
+      for (const pm of pms) {
+        const lastLogin = pm.LastLoginAt ? new Date(pm.LastLoginAt).toLocaleString() : 'Never';
+        html += '<tr><td>' + escapeHTML(pm.FullName || pm.Username) + '</td><td>' + escapeHTML(pm.Email) + '</td>' +
+          '<td style="font-size:12px">' + escapeHTML(pm.AssignedProperties || 'None') + '</td>' +
+          '<td style="font-size:12px">' + lastLogin + '</td>' +
+          '<td><button class="btn btn-sm c-pm-demote" data-uid="' + pm.UserId + '" style="color:#c0392b">Demote</button></td></tr>';
+      }
+      html += '</tbody></table></div>';
+    } else {
+      html += '<p style="color:#999">No Property Managers yet. Use the role selector above to promote a user.</p>';
+    }
+
+    html += '<h3 style="margin:20px 0 10px;font-size:16px">Property Assignments</h3>';
+    html += '<div class="table-wrap"><table class="table"><thead><tr><th>Property</th><th>Assigned PM</th><th></th></tr></thead><tbody>';
+    for (const p of properties) {
+      const a = assignMap[p] || {};
+      const pmOpts = pms.map(pm => '<option value="' + pm.UserId + '"' + (pm.UserId === a.AssignedUserId ? ' selected' : '') + '>' + escapeHTML(pm.FullName || pm.Email) + '</option>').join('');
+      html += '<tr><td>' + escapeHTML(p) + '</td><td><select class="form-input form-input-sm c-pm-assign" data-prop="' + escapeHTML(p) + '" style="width:100%"><option value="">-- None --</option>' + pmOpts + '</select></td>' +
+        '<td>' + (a.AssignedUserId ? '<button class="btn btn-sm c-pm-unassign" data-prop="' + escapeHTML(p) + '" style="color:#c0392b">Remove</button>' : '') + '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+
+    container.innerHTML = html;
+
+    const addPmBtn = document.getElementById('cBtnAddPM');
+    if (addPmBtn) {
+      addPmBtn.addEventListener('click', async () => {
+        const name = (document.getElementById('cPmNameInput')?.value || '').trim();
+        const email = (document.getElementById('cPmEmailInput')?.value || '').trim();
+        if (!name || !email) { showToast('Please enter both name and email.', 'error'); return; }
+        if (!email.toLowerCase().endsWith('@stoagroup.com')) { showToast('Email must be a @stoagroup.com address.', 'error'); return; }
+        try {
+          await API.addPropertyManager(name, email);
+          document.getElementById('cPmNameInput').value = '';
+          document.getElementById('cPmEmailInput').value = '';
+          showToast('Property Manager added successfully.', 'success');
+          renderedTabs.delete('pm-management');
+          renderPMManagementView();
+        } catch (e) { showToast('Error: ' + (e.message || e), 'error'); }
+      });
+    }
+
+    container.querySelectorAll('.c-pm-demote').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Demote this user to ReadOnly?')) return;
+        try {
+          await API.changeUserRole(Number(btn.dataset.uid), 'ReadOnly');
+          showToast('User demoted to ReadOnly', 'success');
+          renderedTabs.delete('pm-management');
+          renderPMManagementView();
+        } catch (e) { showToast('Error: ' + (e.message || e), 'error'); }
+      });
+    });
+
+    container.querySelectorAll('.c-pm-assign').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const prop = sel.dataset.prop;
+        const uid = sel.value ? Number(sel.value) : null;
+        const u = uid ? pms.find(x => x.UserId === uid) : null;
+        try {
+          await API.assignProperty(prop, { userId: uid, userEmail: u?.Email || null, userName: u?.FullName || null });
+          showToast('Assignment updated', 'success');
+        } catch (e) { showToast('Error: ' + (e.message || e), 'error'); }
+      });
+    });
+
+    container.querySelectorAll('.c-pm-unassign').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove PM assignment for this property?')) return;
+        try {
+          await API.removeAssignment(btn.dataset.prop);
+          showToast('Assignment removed', 'success');
+          renderedTabs.delete('pm-management');
+          renderPMManagementView();
+        } catch (e) { showToast('Error: ' + (e.message || e), 'error'); }
+      });
+    });
+  } catch (e) {
+    container.innerHTML = '<p style="color:#c0392b">Error loading PM data: ' + (e.message || e) + '</p>';
+  }
 }
 
 // ============================================================
